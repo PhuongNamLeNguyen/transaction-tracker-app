@@ -84,6 +84,25 @@ export const sessionRepo = {
         );
     },
 
+    findVerificationTokenByHash: async (rawToken: string) => {
+        // Lấy tất cả token còn hạn, rồi so sánh bcrypt từng cái
+        const result = await query(
+            `SELECT * FROM verification_tokens
+     WHERE expired_at > now()
+     ORDER BY created_at DESC`,
+        );
+        return result.rows; // trả về array để service tự bcrypt.compare
+    },
+    findAllActivePasswordResetTokens: async () => {
+        const result = await query(
+            `SELECT * FROM password_reset_tokens
+     WHERE expired_at > now()
+       AND used_at IS NULL
+     ORDER BY created_at DESC`,
+        );
+        return result.rows;
+    },
+
     // ─── Password reset tokens ───────────────────────────────
 
     createPasswordResetToken: async (userId: string, tokenHash: string) => {

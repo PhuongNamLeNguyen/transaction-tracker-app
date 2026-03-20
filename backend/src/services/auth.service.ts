@@ -10,7 +10,8 @@ import { AppError } from "../utils/AppError";
 
 const BCRYPT_ROUNDS = 12;
 const ACCESS_TOKEN_TTL = "15m";
-const REFRESH_TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+const REFRESH_TOKEN_TTL_REMEMBER_MS = 30 * 24 * 60 * 60 * 1000; // 30 ngày — có tích
+const REFRESH_TOKEN_TTL_NO_REMEMBER_MS = 24 * 60 * 60 * 1000; // 1 ngày  — không tích
 
 export interface JwtPayload {
     sub: string;
@@ -38,34 +39,32 @@ const generateRawToken = () => crypto.randomBytes(32).toString("hex");
 export const authService = {
     // Register → tạo user + settings + verification token
     // Trả về { id, email } — KHÔNG trả token (phải verify email trước)
-    register: async (email: string, password: string) => {
+    register: async (email: string, password: string, name: string) => {
         const existing = await userRepo.findByEmail(email);
         if (existing) {
             throw new AppError("Email already in use", 400, "VALIDATION_ERROR");
         }
 
         const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
-        const user = await userRepo.create(email, passwordHash);
+        const user = await userRepo.create(email, passwordHash, name); // ← thêm name
 
-        // Tạo user_settings mặc định
         await userRepo.createSettings(user.id);
 
-        // Tạo verification token
         const rawToken = generateRawToken();
         const tokenHash = await bcrypt.hash(rawToken, BCRYPT_ROUNDS);
         await sessionRepo.createVerificationToken(user.id, tokenHash);
 
-        // TODO: Gửi email verification — sẽ implement khi có email service
-        // emailService.sendVerification(email, rawToken)
         console.log(`[DEV] Verification token for ${email}: ${rawToken}`);
 
-        return { id: user.id, email: user.email };
+        return { id: user.id, email: user.email, name: user.name };
     },
 
     // Verify email → set is_verified = true
-    verifyEmail: async (rawToken: string, userId: string) => {
-        const tokenRecord = await sessionRepo.findVerificationToken(userId);
-        if (!tokenRecord) {
+    verifyEmail: async (rawToken: string) => {
+        // bỏ userId
+        // Lấy tất cả token còn hạn
+        const tokens = await sessionRepo.findVerificationTokenByHash(rawToken);
+        if (!tokens.length) {
             throw new AppError(
                 "Token invalid or expired",
                 400,
@@ -73,8 +72,17 @@ export const authService = {
             );
         }
 
-        const valid = await bcrypt.compare(rawToken, tokenRecord.token_hash);
-        if (!valid) {
+        // So sánh bcrypt từng token
+        let matched = null;
+        for (const t of tokens) {
+            const valid = await bcrypt.compare(rawToken, t.token_hash);
+            if (valid) {
+                matched = t;
+                break;
+            }
+        }
+
+        if (!matched) {
             throw new AppError(
                 "Token invalid or expired",
                 400,
@@ -82,14 +90,15 @@ export const authService = {
             );
         }
 
-        await userRepo.setVerified(userId);
-        await sessionRepo.expireVerificationToken(tokenRecord.id);
+        await userRepo.setVerified(matched.user_id);
+        await sessionRepo.expireVerificationToken(matched.id);
     },
 
     // Login → trả access token (body) + refresh token (cookie)
     login: async (
         email: string,
         password: string,
+        rememberMe: boolean = false,
         deviceInfo?: string,
         ipAddress?: string,
     ) => {
@@ -116,7 +125,10 @@ export const authService = {
             rawRefreshToken,
             BCRYPT_ROUNDS,
         );
-        const expiredAt = new Date(Date.now() + REFRESH_TOKEN_TTL_MS);
+        const ttl = rememberMe
+            ? REFRESH_TOKEN_TTL_REMEMBER_MS
+            : REFRESH_TOKEN_TTL_NO_REMEMBER_MS;
+        const expiredAt = new Date(Date.now() + ttl); // ← dùng ttl
 
         await sessionRepo.createSession(
             user.id,
@@ -129,6 +141,7 @@ export const authService = {
         return {
             accessToken,
             refreshToken: rawRefreshToken, // raw token → set vào cookie
+            rememberMe,
             user: {
                 id: user.id,
                 email: user.email,
@@ -163,13 +176,18 @@ export const authService = {
         const accessToken = signAccessToken(user);
         const rawNewToken = generateRawToken();
         const newTokenHash = await bcrypt.hash(rawNewToken, BCRYPT_ROUNDS);
-        const expiredAt = new Date(Date.now() + REFRESH_TOKEN_TTL_MS);
+        const expiredAt = new Date(Date.now() + REFRESH_TOKEN_TTL_REMEMBER_MS);
 
         await sessionRepo.createSession(user.id, newTokenHash, expiredAt);
 
         return {
             accessToken,
             refreshToken: rawNewToken,
+            user: {
+                id: user.id,
+                email: user.email,
+                isVerified: user.is_verified,
+            },
         };
     },
 
@@ -194,13 +212,11 @@ export const authService = {
     },
 
     // Reset password → verify token, update password, revoke tất cả sessions
-    resetPassword: async (
-        rawToken: string,
-        userId: string,
-        newPassword: string,
-    ) => {
-        const tokenRecord = await sessionRepo.findPasswordResetToken(userId);
-        if (!tokenRecord) {
+    resetPassword: async (rawToken: string, newPassword: string) => {
+        // bỏ userId
+        // Tìm tất cả token còn hạn rồi bcrypt.compare từng cái
+        const tokens = await sessionRepo.findAllActivePasswordResetTokens();
+        if (!tokens.length) {
             throw new AppError(
                 "Token invalid or expired",
                 400,
@@ -208,8 +224,16 @@ export const authService = {
             );
         }
 
-        const valid = await bcrypt.compare(rawToken, tokenRecord.token_hash);
-        if (!valid) {
+        let matched = null;
+        for (const t of tokens) {
+            const valid = await bcrypt.compare(rawToken, t.token_hash);
+            if (valid) {
+                matched = t;
+                break;
+            }
+        }
+
+        if (!matched) {
             throw new AppError(
                 "Token invalid or expired",
                 400,
@@ -218,10 +242,8 @@ export const authService = {
         }
 
         const passwordHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
-        await userRepo.updatePassword(userId, passwordHash);
-        await sessionRepo.markResetTokenUsed(tokenRecord.id);
-
-        // Revoke tất cả sessions — bắt re-login ở tất cả thiết bị
-        await sessionRepo.revokeAllUserSessions(userId);
+        await userRepo.updatePassword(matched.user_id, passwordHash);
+        await sessionRepo.markResetTokenUsed(matched.id);
+        await sessionRepo.revokeAllUserSessions(matched.user_id);
     },
 };

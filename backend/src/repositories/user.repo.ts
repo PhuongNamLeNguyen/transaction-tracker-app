@@ -17,12 +17,12 @@ export const userRepo = {
         return result.rows[0] ?? null;
     },
 
-    create: async (email: string, passwordHash: string) => {
+    create: async (email: string, passwordHash: string, name: string) => {
         const result = await query(
-            `INSERT INTO users (email, password_hash)
-       VALUES ($1, $2)
-       RETURNING id, email, is_verified, created_at`,
-            [email, passwordHash],
+            `INSERT INTO users (email, password_hash, name)
+     VALUES ($1, $2, $3)
+     RETURNING id, email, name, is_verified, created_at`,
+            [email, passwordHash, name],
         );
         return result.rows[0];
     },

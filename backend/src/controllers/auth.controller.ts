@@ -14,38 +14,44 @@ const COOKIE_OPTIONS = {
 
 export const authController = {
     register: asyncHandler(async (req: Request, res: Response) => {
-        const { email, password } = req.body;
-        const data = await authService.register(email, password);
+        const { email, password, name } = req.body; // ← thêm name
+        const data = await authService.register(email, password, name);
         sendSuccess(res, data, 201);
     }),
 
     verifyEmail: asyncHandler(async (req: Request, res: Response) => {
-        // Token và userId truyền qua query string: ?token=xxx&userId=xxx
-        const { token, userId } = req.query as {
-            token: string;
-            userId: string;
-        };
-        await authService.verifyEmail(token, userId);
+        const { token } = req.query as { token: string }; // bỏ userId
+        await authService.verifyEmail(token);
         sendSuccess(res, { message: "Email verified. You may now log in." });
     }),
 
     login: asyncHandler(async (req: Request, res: Response) => {
-        const { email, password } = req.body;
+        const { email, password, rememberMe = false } = req.body;
         const deviceInfo = req.headers["user-agent"];
         const ipAddress = req.ip;
 
-        const { accessToken, refreshToken, user } = await authService.login(
+        const result = await authService.login(
             email,
             password,
+            rememberMe,
             deviceInfo,
             ipAddress,
         );
 
-        // Refresh token → HttpOnly cookie
-        res.cookie(REFRESH_COOKIE_NAME, refreshToken, COOKIE_OPTIONS);
+        const cookieOptions = {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === "production",
+            sameSite: "strict" as const,
+            path: "/api/v1/auth/refresh",
+            ...(result.rememberMe ? { maxAge: 30 * 24 * 60 * 60 * 1000 } : {}),
+        };
 
-        // Access token → response body
-        sendSuccess(res, { accessToken, user });
+        res.cookie("refresh_token", result.refreshToken, cookieOptions);
+        sendSuccess(res, {
+            accessToken: result.accessToken,
+            user: result.user,
+            rememberMe: result.rememberMe,
+        });
     }),
 
     refresh: asyncHandler(async (req: Request, res: Response) => {
@@ -101,8 +107,8 @@ export const authController = {
     }),
 
     resetPassword: asyncHandler(async (req: Request, res: Response) => {
-        const { token, newPassword, userId } = req.body;
-        await authService.resetPassword(token, userId, newPassword);
+        const { token, newPassword } = req.body; // bỏ userId
+        await authService.resetPassword(token, newPassword);
         sendSuccess(res, { message: "Password reset. Please log in again." });
     }),
 };
