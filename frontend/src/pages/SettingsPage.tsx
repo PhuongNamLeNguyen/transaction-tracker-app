@@ -320,7 +320,7 @@ export const SettingsPage = () => {
                 <div>
                     <div className="settings-section__label">Dữ liệu</div>
                     <div className="settings-card">
-                        <button className="settings-row">
+                        <button className="settings-row" onClick={() => navigate("/deleted-transactions")}>
                             <div className="settings-row__icon" style={{ background: iconBg.deleted }}>🗑️</div>
                             <div className="settings-row__body">
                                 <div className="settings-row__label">Giao dịch đã xoá</div>

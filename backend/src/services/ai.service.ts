@@ -1,6 +1,12 @@
-import Anthropic from "@anthropic-ai/sdk";
+import Anthropic, { APIError } from "@anthropic-ai/sdk";
+import { AppError } from "../utils/AppError";
 
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+const apiKey = process.env.ANTHROPIC_API_KEY;
+if (!apiKey || apiKey.startsWith("sk-ant-...")) {
+    console.warn("[ai.service] WARNING: ANTHROPIC_API_KEY is not set or is still a placeholder.");
+}
+
+const client = new Anthropic({ apiKey });
 
 export interface AiReceiptItem {
     itemName: string;
@@ -102,23 +108,86 @@ Rules:
 
     contentBlocks.push({ type: "text", text: prompt });
 
-    const response = await client.messages.create({
-        model: "claude-haiku-4-5-20251001",
-        max_tokens: 2048,
-        messages: [{ role: "user", content: contentBlocks }],
-    });
+    let response: Anthropic.Message;
+    try {
+        response = await client.messages.create({
+            model: "claude-haiku-4-5-20251001",
+            max_tokens: 2048,
+            messages: [{ role: "user", content: contentBlocks }],
+        });
+    } catch (err) {
+        if (err instanceof APIError) {
+            // Extract the inner message from Anthropic's error body
+            const body = err.error as { error?: { message?: string; type?: string } } | undefined;
+            const innerMsg = body?.error?.message ?? err.message ?? "";
+            const innerType = body?.error?.type ?? "";
+
+            if (process.env.NODE_ENV !== "production") {
+                console.error(`[ai.service] Anthropic API error — status=${err.status} type=${innerType} msg=${innerMsg}`);
+            }
+
+            // Credit / billing errors (status 400 + specific message)
+            const isCreditError =
+                err.status === 400 &&
+                (innerMsg.toLowerCase().includes("credit balance") ||
+                    innerMsg.toLowerCase().includes("too low"));
+            if (isCreditError) {
+                throw new AppError(
+                    "Dịch vụ quét hóa đơn tạm thời không khả dụng (hết credit AI). Vui lòng nhập thủ công.",
+                    503,
+                    "AI_LIMIT_REACHED",
+                );
+            }
+
+            // Rate limit
+            if (err.status === 429) {
+                throw new AppError(
+                    "Đã đạt giới hạn quét hóa đơn. Vui lòng thử lại sau hoặc nhập thủ công.",
+                    429,
+                    "AI_LIMIT_REACHED",
+                );
+            }
+
+            // Service unavailable / overloaded
+            if (err.status === 529 || err.status === 502 || err.status === 503) {
+                throw new AppError(
+                    "Dịch vụ AI đang bận. Vui lòng thử lại sau hoặc nhập thủ công.",
+                    503,
+                    "THIRD_PARTY_ERROR",
+                );
+            }
+
+            // Auth errors (invalid key)
+            if (err.status === 401) {
+                throw new AppError(
+                    "API key không hợp lệ. Vui lòng kiểm tra ANTHROPIC_API_KEY trong .env.",
+                    503,
+                    "THIRD_PARTY_ERROR",
+                );
+            }
+        }
+        throw err;
+    }
 
     const text = response.content[0]?.type === "text" ? response.content[0].text : "{}";
 
+    if (process.env.NODE_ENV !== "production") {
+        console.log("[ai.service] Claude raw response:", text.slice(0, 500));
+    }
+
     const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) throw new Error("AI_PROCESSING_FAILED");
+    if (!jsonMatch) {
+        console.error("[ai.service] No JSON found in Claude response");
+        throw new Error("AI_PROCESSING_FAILED");
+    }
 
     try {
         const parsed = JSON.parse(jsonMatch[0]) as AiReceiptData;
         // Ensure items is always an array
         if (!Array.isArray(parsed.items)) parsed.items = [];
         return parsed;
-    } catch {
+    } catch (parseErr) {
+        console.error("[ai.service] JSON parse error:", parseErr);
         throw new Error("AI_PROCESSING_FAILED");
     }
 }

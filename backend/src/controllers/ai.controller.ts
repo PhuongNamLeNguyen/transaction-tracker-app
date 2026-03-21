@@ -134,16 +134,21 @@ export const aiController = {
             sendSuccess(res, { suggestion, confidenceLevel });
         } catch (err) {
             if (receipt) {
-                await receiptsRepo.updateOcrStatus(receipt.id, "error", {
-                    scanData: {
-                        errorCode: err instanceof AppError ? err.code : "AI_PROCESSING_FAILED",
-                        errorDetail: String(err),
-                    },
-                });
+                try {
+                    await receiptsRepo.updateOcrStatus(receipt.id, "error", {
+                        scanData: {
+                            errorCode: err instanceof AppError ? err.code : "AI_PROCESSING_FAILED",
+                            errorDetail: String(err),
+                        },
+                    });
+                } catch { /* ignore secondary failure */ }
+            }
+            if (process.env.NODE_ENV !== "production") {
+                console.error("[ai/extract-by-url] error:", err);
             }
             if (err instanceof AppError) throw err;
             throw new AppError(
-                "Something went wrong reading your receipt. Please try again or use manual entry.",
+                "Không thể đọc hóa đơn. Vui lòng thử lại hoặc nhập thủ công.",
                 500,
                 "AI_PROCESSING_FAILED",
             );

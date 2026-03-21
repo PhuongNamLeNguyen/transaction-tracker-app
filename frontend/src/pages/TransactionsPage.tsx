@@ -1,8 +1,9 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import {
     transactionsApi,
     type TxListItem,
     type TxDetail,
+    type TxSplit,
     type TxCategory,
     type TransactionType,
 } from "@/api/transactions.api";
@@ -203,18 +204,162 @@ function Calendar({
 }
 
 /* ─────────────────────────────────────────
+   Swipeable split row
+───────────────────────────────────────── */
+const SWIPE_THRESHOLD = 0.5; // fraction of row width
+
+function SwipeSplitRow({
+    split,
+    currency,
+    onDelete,
+}: {
+    split: TxSplit;
+    currency: string;
+    onDelete: (id: string) => void;
+}) {
+    const [offsetX, setOffsetX] = useState(0);
+    // Use refs (not state) for dragging/revealed so event handlers always read
+    // the latest value without stale-closure bugs across renders.
+    const isDragging = useRef(false);
+    const isRevealed = useRef(false);
+    const startX    = useRef(0);
+    const rowRef    = useRef<HTMLDivElement>(null);
+
+    const ACTION_WIDTH = 80;
+
+    function onPointerDown(e: React.PointerEvent) {
+        startX.current = e.clientX;
+        isDragging.current = true;
+        (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    }
+
+    function onPointerMove(e: React.PointerEvent) {
+        if (!isDragging.current) return;
+        const dx = e.clientX - startX.current;
+        // Offset starting position when button is already revealed
+        const base = isRevealed.current ? -ACTION_WIDTH : 0;
+        const raw  = base + dx;
+        // Only leftward movement (negative); clamp to 1.4× action width
+        setOffsetX(Math.max(-ACTION_WIDTH * 1.4, Math.min(0, raw)));
+    }
+
+    function onPointerUp() {
+        if (!isDragging.current) return;
+        isDragging.current = false;
+        const rowW     = rowRef.current?.offsetWidth ?? 320;
+        const absOffset = Math.abs(offsetX);
+
+        if (absOffset >= rowW * SWIPE_THRESHOLD) {
+            // Past 50% — delete immediately
+            setOffsetX(0);
+            isRevealed.current = false;
+            onDelete(split.id);
+        } else if (absOffset >= ACTION_WIDTH * 0.6) {
+            // Snap to reveal delete button
+            setOffsetX(-ACTION_WIDTH);
+            isRevealed.current = true;
+        } else {
+            // Snap back
+            setOffsetX(0);
+            isRevealed.current = false;
+        }
+    }
+
+    return (
+        <div className="swipe-row" ref={rowRef}>
+            <div className="swipe-row__action">
+                <button
+                    className="swipe-row__delete-btn"
+                    onClick={() => { setOffsetX(0); isRevealed.current = false; onDelete(split.id); }}
+                    type="button"
+                >
+                    <Icon name="delete" size={18} />
+                    Xoá
+                </button>
+            </div>
+            <div
+                className="swipe-row__content"
+                style={{
+                    transform: `translateX(${offsetX}px)`,
+                    transition: isDragging.current ? "none" : "transform 0.2s ease",
+                }}
+                onPointerDown={onPointerDown}
+                onPointerMove={onPointerMove}
+                onPointerUp={onPointerUp}
+                onPointerCancel={onPointerUp}
+            >
+                <span className="detail-row__value">{split.categoryName}</span>
+                <span className="detail-row__value" style={{ fontWeight: 600 }}>
+                    {formatCurrency(split.amount, currency)}
+                </span>
+            </div>
+        </div>
+    );
+}
+
+/* ─────────────────────────────────────────
    Transaction Detail Sheet
 ───────────────────────────────────────── */
 function DetailSheet({
     tx,
     onClose,
+    onSplitDeleted,
 }: {
     tx: TxDetail;
     onClose: () => void;
+    onSplitDeleted: (txId: string, splitId: string) => void;
 }) {
-    const primaryCategory = tx.splits[0]?.categoryName ?? null;
+    const [splits, setSplits] = useState<TxSplit[]>(tx.splits);
+    const [undoSplit, setUndoSplit] = useState<TxSplit | null>(null);
+    const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
     const timeStr = formatTime(tx.createdAt);
     const dateStr = formatDateShort(tx.transactionDate);
+
+    const splitsTotal = splits.reduce((s, sp) => s + sp.amount, 0);
+    const mismatch = splits.length > 0 && Math.abs(splitsTotal - tx.amount) > 0.01;
+
+    async function handleDelete(splitId: string) {
+        const target = splits.find((s) => s.id === splitId);
+        if (!target) return;
+
+        // Optimistic removal
+        setSplits((prev) => prev.filter((s) => s.id !== splitId));
+        setUndoSplit(target);
+
+        // Clear any existing undo timer
+        if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
+        undoTimerRef.current = setTimeout(async () => {
+            setUndoSplit(null);
+            try {
+                await transactionsApi.deleteSplit(tx.id, splitId);
+                onSplitDeleted(tx.id, splitId);
+            } catch {
+                // Revert on error
+                setSplits((prev) => {
+                    const idx = tx.splits.findIndex((s) => s.id === splitId);
+                    const copy = [...prev];
+                    copy.splice(idx, 0, target);
+                    return copy;
+                });
+            }
+        }, 3000);
+    }
+
+    function handleUndo() {
+        if (!undoSplit) return;
+        if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
+        setSplits((prev) => {
+            const idx = tx.splits.findIndex((s) => s.id === undoSplit.id);
+            const copy = [...prev];
+            copy.splice(idx, 0, undoSplit);
+            return copy;
+        });
+        setUndoSplit(null);
+    }
+
+    // Cleanup timer on unmount
+    useEffect(() => () => { if (undoTimerRef.current) clearTimeout(undoTimerRef.current); }, []);
 
     return (
         <>
@@ -243,23 +388,31 @@ function DetailSheet({
                         <span className="detail-row__label">Ngày giờ</span>
                         <span className="detail-row__value">{timeStr} – {dateStr}</span>
                     </div>
-                    {primaryCategory && (
-                        <div className="detail-row">
+                    {splits.length > 0 && (
+                        <div className="detail-row" style={{ flexDirection: "column", gap: "var(--space-2)", alignItems: "stretch" }}>
                             <span className="detail-row__label">Danh mục</span>
-                            <span className="detail-row__value">{primaryCategory}</span>
+                            <div className="detail-splits-list">
+                                {splits.map((s) => (
+                                    <SwipeSplitRow
+                                        key={s.id}
+                                        split={s}
+                                        currency={tx.currency}
+                                        onDelete={handleDelete}
+                                    />
+                                ))}
+                            </div>
+                            {mismatch && (
+                                <div className="detail-splits-mismatch">
+                                    <Icon name="warning" size={14} />
+                                    Tổng phân bổ ({formatCurrency(splitsTotal, tx.currency)}) không khớp tổng giao dịch. Chỉnh sửa để cân bằng.
+                                </div>
+                            )}
                         </div>
                     )}
-                    {tx.splits.length > 1 && (
-                        <div className="detail-row" style={{ flexDirection: "column", gap: "var(--space-2)" }}>
-                            <span className="detail-row__label">Phân bổ</span>
-                            {tx.splits.map((s) => (
-                                <div key={s.id} style={{ display: "flex", justifyContent: "space-between", width: "100%" }}>
-                                    <span className="detail-row__value">{s.categoryName}</span>
-                                    <span className="detail-row__value" style={{ fontWeight: 600 }}>
-                                        {formatCurrency(s.amount, tx.currency)}
-                                    </span>
-                                </div>
-                            ))}
+                    {splits.length === 0 && (
+                        <div className="detail-splits-mismatch">
+                            <Icon name="warning" size={14} />
+                            Tất cả phân bổ đã bị xoá. Khôi phục ở Cài đặt → Giao dịch đã xoá.
                         </div>
                     )}
                     <div className="detail-row">
@@ -274,6 +427,14 @@ function DetailSheet({
                     )}
                 </div>
             </div>
+
+            {/* Undo toast */}
+            {undoSplit && (
+                <div className="undo-toast">
+                    <span>Đã xoá mục</span>
+                    <button className="undo-toast__btn" onClick={handleUndo} type="button">Hoàn tác</button>
+                </div>
+            )}
         </>
     );
 }
@@ -549,7 +710,11 @@ export const TransactionsPage = () => {
                 </div>
             )}
             {detailTx && !detailLoading && (
-                <DetailSheet tx={detailTx} onClose={() => setDetailTx(null)} />
+                <DetailSheet
+                    tx={detailTx}
+                    onClose={() => setDetailTx(null)}
+                    onSplitDeleted={(_txId, _splitId) => { /* list reload on close is enough */ }}
+                />
             )}
 
             {openDropdown && anchorRect && (

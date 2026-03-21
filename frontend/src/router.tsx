@@ -9,6 +9,8 @@ import { TransactionsPage } from "@/pages/TransactionsPage";
 import { BudgetPage } from "@/pages/BudgetPage";
 import { SettingsPage } from "@/pages/SettingsPage";
 import { AddTransactionPage } from "@/pages/AddTransactionPage";
+import { ReceiptReviewPage } from "@/pages/ReceiptReviewPage";
+import { DeletedTransactionsPage } from "@/pages/DeletedTransactionsPage";
 
 /*
   Route structure:
@@ -36,6 +38,8 @@ export const router = createBrowserRouter([
             { path: "/budgets",       element: <BudgetPage /> },
             { path: "/settings",          element: <SettingsPage /> },
             { path: "/add-transaction",   element: <AddTransactionPage /> },
+            { path: "/receipt-review",         element: <ReceiptReviewPage /> },
+            { path: "/deleted-transactions",   element: <DeletedTransactionsPage /> },
             // Các route sau sẽ thêm dần theo từng feature:
             // { path: '/transactions/:id', element: <TransactionDetailPage /> },
             // { path: '/accounts',         element: <AccountsPage /> },

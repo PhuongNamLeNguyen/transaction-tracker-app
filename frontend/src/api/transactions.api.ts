@@ -63,6 +63,14 @@ export interface CreateTransactionDto {
     note?: string;
 }
 
+export interface CreateReceiptTransactionDto {
+    type: TransactionType;
+    transactionDate: string; // YYYY-MM-DD
+    receiptId: string;
+    note?: string;
+    items: { categoryId: string; amount: number }[];
+}
+
 export interface CreateTransactionResponse {
     id: string;
     type: TransactionType;
@@ -71,6 +79,19 @@ export interface CreateTransactionResponse {
     transactionDate: string;
     note: string | null;
     createdAt: string;
+}
+
+export interface DeletedSplitItem {
+    id: string;
+    transactionId: string;
+    transactionType: TransactionType;
+    amount: number;
+    currency: string;
+    transactionDate: string;
+    categoryId: string;
+    categoryName: string;
+    categoryIcon: string | null;
+    deletedAt: string;
 }
 
 /* ─── API ─── */
@@ -116,7 +137,7 @@ export const transactionsApi = {
         return (await res.json()).data;
     },
 
-    /** POST /transactions */
+    /** POST /transactions — manual entry */
     async create(dto: CreateTransactionDto): Promise<CreateTransactionResponse> {
         const res = await fetch(`${BASE}/transactions`, {
             method: "POST",
@@ -126,5 +147,81 @@ export const transactionsApi = {
         });
         if (!res.ok) throw await res.json();
         return (await res.json()).data;
+    },
+
+    /** POST /transactions — receipt scan (multi-split) */
+    async createFromReceipt(dto: CreateReceiptTransactionDto): Promise<CreateTransactionResponse> {
+        const res = await fetch(`${BASE}/transactions`, {
+            method: "POST",
+            headers: authHeaders(),
+            credentials: "include",
+            body: JSON.stringify(dto),
+        });
+        if (!res.ok) throw await res.json();
+        return (await res.json()).data;
+    },
+
+    /** DELETE /transactions/:id/splits/:splitId — soft-delete */
+    async deleteSplit(transactionId: string, splitId: string): Promise<void> {
+        const res = await fetch(`${BASE}/transactions/${transactionId}/splits/${splitId}`, {
+            method: "DELETE",
+            headers: authHeaders(),
+            credentials: "include",
+        });
+        if (!res.ok) throw await res.json();
+    },
+
+    /** DELETE /transactions/:id/splits/:splitId/permanent — hard-delete */
+    async hardDeleteSplit(transactionId: string, splitId: string): Promise<void> {
+        const res = await fetch(`${BASE}/transactions/${transactionId}/splits/${splitId}/permanent`, {
+            method: "DELETE",
+            headers: authHeaders(),
+            credentials: "include",
+        });
+        if (!res.ok) throw await res.json();
+    },
+
+    /** DELETE /transactions/splits/permanent — bulk hard-delete */
+    async bulkHardDeleteSplits(splitIds: string[]): Promise<{ deleted: number }> {
+        const res = await fetch(`${BASE}/transactions/splits/permanent`, {
+            method: "DELETE",
+            headers: authHeaders(),
+            credentials: "include",
+            body: JSON.stringify({ splitIds }),
+        });
+        if (!res.ok) throw await res.json();
+        return (await res.json()).data;
+    },
+
+    /** PATCH /transactions/:id/splits/:splitId/restore — restore */
+    async restoreSplit(transactionId: string, splitId: string): Promise<void> {
+        const res = await fetch(`${BASE}/transactions/${transactionId}/splits/${splitId}/restore`, {
+            method: "PATCH",
+            headers: authHeaders(),
+            credentials: "include",
+        });
+        if (!res.ok) throw await res.json();
+    },
+
+    /** PATCH /transactions/splits/restore — bulk restore */
+    async bulkRestoreSplits(splitIds: string[]): Promise<{ restored: number }> {
+        const res = await fetch(`${BASE}/transactions/splits/restore`, {
+            method: "PATCH",
+            headers: authHeaders(),
+            credentials: "include",
+            body: JSON.stringify({ splitIds }),
+        });
+        if (!res.ok) throw await res.json();
+        return (await res.json()).data;
+    },
+
+    /** GET /transactions/splits/deleted */
+    async getDeletedSplits(): Promise<DeletedSplitItem[]> {
+        const res = await fetch(`${BASE}/transactions/splits/deleted`, {
+            headers: authHeaders(),
+            credentials: "include",
+        });
+        if (!res.ok) throw await res.json();
+        return (await res.json()).data.splits;
     },
 };

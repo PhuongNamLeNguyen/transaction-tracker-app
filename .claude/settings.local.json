@@ -4,7 +4,12 @@
       "Bash(npm run:*)",
       "Bash(npx tsc:*)",
       "Bash(find '/d/WORK/Project AI/New/transaction_tracker_app/backend/src' -type f -name *.ts)",
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "Bash(git -C \"d:/WORK/Project AI/New/transaction_tracker_app\" check-ignore -v backend/.env)",
+      "Bash(git -C \"d:/WORK/Project AI/New/transaction_tracker_app\" ls-files backend/.env)",
+      "Bash(git -C \"d:/WORK/Project AI/New/transaction_tracker_app\" rm --cached backend/.env)",
+      "Bash(printf '\\\\n# Anthropic API — get your key at https://console.anthropic.com\\\\nANTHROPIC_API_KEY=sk-ant-...\\\\n\\\\n# Public URL of this server \\(used to build receipt image URLs\\)\\\\nBASE_URL=http://localhost:3000\\\\n')",
+      "Bash(\"d:/WORK/Project AI/New/transaction_tracker_app/backend/.env\")"
     ]
   }
 }

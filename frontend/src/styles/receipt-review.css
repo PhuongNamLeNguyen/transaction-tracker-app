@@ -1,0 +1,346 @@
+/* ── Receipt Review Page ─────────────────────────────────────── */
+.rxv-page {
+    display: flex;
+    flex-direction: column;
+    min-height: 100dvh;
+    background: var(--color-bg);
+    padding-bottom: env(safe-area-inset-bottom, 0);
+}
+
+/* ── Header ── */
+.rxv-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-3) var(--space-4);
+    background: var(--color-surface);
+    border-bottom: 1px solid var(--color-border);
+    position: sticky;
+    top: 0;
+    z-index: var(--z-sticky);
+    min-height: 56px;
+}
+.rxv-header__back {
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--color-text-primary);
+    border-radius: var(--radius-full);
+    padding: 0;
+    transition: background var(--duration-fast) var(--ease-standard);
+}
+.rxv-header__back:active { background: var(--color-border); }
+.rxv-header__back:disabled { opacity: 0.4; cursor: not-allowed; }
+.rxv-header__title {
+    font-size: var(--text-base);
+    font-weight: var(--weight-semibold);
+    color: var(--color-text-primary);
+    margin: 0;
+}
+
+/* ── Type badge ── */
+.rxv-type-badge {
+    display: inline-block;
+    padding: var(--space-1) var(--space-3);
+    border-radius: var(--radius-full);
+    font-size: var(--text-xs);
+    font-weight: var(--weight-semibold);
+    color: #fff;
+    letter-spacing: 0.02em;
+}
+.rxv-type-badge--sm {
+    padding: 2px var(--space-2);
+    font-size: 11px;
+}
+
+/* ── Preview phase ── */
+.rxv-preview-body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-4);
+    padding: var(--space-5) var(--space-4);
+    padding-bottom: calc(100px + var(--space-4));
+    overflow-y: auto;
+}
+
+.rxv-preview-wrap {
+    position: relative;
+    width: 100%;
+    max-width: 420px;
+    border-radius: var(--radius-xl);
+    overflow: hidden;
+    box-shadow: var(--shadow-md);
+    background: var(--color-surface);
+}
+.rxv-preview-wrap--scanning .rxv-preview-img {
+    filter: brightness(0.45);
+}
+
+.rxv-preview-img {
+    width: 100%;
+    max-height: 55dvh;
+    object-fit: contain;
+    display: block;
+    transition: filter var(--duration-base) var(--ease-standard);
+}
+
+.rxv-scan-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-3);
+    color: #fff;
+    font-size: var(--text-base);
+    font-weight: var(--weight-semibold);
+}
+.rxv-scan-overlay p { margin: 0; }
+
+/* ── Preview footer ── */
+.rxv-preview-footer {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    display: flex;
+    gap: var(--space-3);
+    padding: var(--space-3) var(--space-4);
+    padding-bottom: calc(var(--space-3) + env(safe-area-inset-bottom, 0px));
+    background: var(--color-surface);
+    border-top: 1px solid var(--color-border);
+    z-index: var(--z-sticky);
+}
+
+.rxv-btn {
+    flex: 1;
+    height: 52px;
+    border: none;
+    border-radius: var(--radius-xl);
+    font-size: var(--text-sm);
+    font-weight: var(--weight-semibold);
+    font-family: var(--font-sans);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    transition: opacity var(--duration-fast) var(--ease-standard);
+}
+.rxv-btn--ghost {
+    background: var(--color-surface-raised);
+    color: var(--color-text-primary);
+    border: 1px solid var(--color-border);
+    flex: 0 0 auto;
+    padding: 0 var(--space-4);
+}
+.rxv-btn--primary {
+    color: #fff;
+}
+.rxv-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* ── Error box ── */
+.rxv-error-box {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-2);
+    padding: var(--space-3) var(--space-4);
+    background: var(--color-error-bg);
+    color: var(--color-error);
+    border: 1px solid var(--color-error);
+    border-radius: var(--radius-lg);
+    font-size: var(--text-sm);
+    font-weight: var(--weight-medium);
+    width: 100%;
+    max-width: 420px;
+}
+
+/* ── Review phase — topbar override ── */
+/* detail-sheet__topbar is used as a sticky page header (not inside a sheet) */
+.rxv-topbar {
+    position: sticky;
+    top: 0;
+    z-index: var(--z-sticky);
+    background: var(--color-surface);
+    border-bottom: 1px solid var(--color-border);
+}
+
+/* Override detail-sheet__close: show arrow_back icon, not X */
+.rxv-back-btn {
+    color: var(--color-text-primary);
+}
+
+/* ── Review scrollable body ── */
+.rxv-review-body {
+    flex: 1;
+    overflow-y: auto;
+    padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px));
+}
+
+/* ── Warning banner (low-confidence items) ── */
+.rxv-warning-banner {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-2);
+    padding: var(--space-3) var(--space-4);
+    background: var(--color-warning-bg);
+    color: var(--color-warning);
+    border-bottom: 1px solid var(--color-warning);
+    font-size: var(--text-sm);
+    font-weight: var(--weight-medium);
+    line-height: var(--leading-snug);
+}
+
+/* ── Inline editable input inside detail-row ── */
+.rxv-inline-input {
+    flex: 1;
+    background: none;
+    border: none;
+    outline: none;
+    font-size: var(--text-sm);
+    color: var(--color-text-secondary);
+    font-family: var(--font-sans);
+    text-align: right;
+    min-width: 0;
+}
+.rxv-inline-input::placeholder { color: var(--color-text-tertiary); }
+
+/* ── Date row: visible text + hidden date input overlay ── */
+.rxv-date-row {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+}
+.rxv-date-hidden {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+    width: 100%;
+    height: 100%;
+}
+.rxv-date-edit-icon {
+    color: var(--color-text-tertiary);
+    flex-shrink: 0;
+}
+
+/* ── Items row — column layout inside detail-row ── */
+.rxv-items-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-2);
+}
+.rxv-items-col {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    width: 100%;
+}
+
+/* ── Individual item entry ── */
+.rxv-item-entry {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    padding: var(--space-2) var(--space-3);
+    background: var(--color-surface-raised);
+    border-radius: var(--radius-lg);
+}
+.rxv-item-entry--low {
+    border-left: 3px solid var(--color-warning);
+}
+.rxv-item-entry__top {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-2);
+}
+.rxv-item-entry__name {
+    font-size: var(--text-sm);
+    font-weight: var(--weight-medium);
+    color: var(--color-text-primary);
+    flex: 1;
+}
+.rxv-item-entry__qty {
+    font-size: var(--text-xs);
+    color: var(--color-text-secondary);
+}
+.rxv-item-entry__amount {
+    font-size: var(--text-sm);
+    font-weight: var(--weight-semibold);
+    color: var(--color-accent);
+    white-space: nowrap;
+}
+
+/* ── Error box inline variant (inside scrollable body) ── */
+.rxv-error-box--inline {
+    margin: 0 var(--space-5) var(--space-2);
+    max-width: none;
+}
+
+.rxv-cat-chip {
+    display: inline-block;
+    padding: 2px var(--space-3);
+    background: var(--color-surface-raised);
+    color: var(--color-text-secondary);
+    border-radius: var(--radius-full);
+    font-size: var(--text-xs);
+    font-weight: var(--weight-medium);
+}
+.rxv-cat-select {
+    flex: 1;
+    background: var(--color-surface-raised);
+    border: 1.5px solid var(--color-warning);
+    border-radius: var(--radius-lg);
+    padding: var(--space-1) var(--space-2);
+    font-size: var(--text-xs);
+    font-weight: var(--weight-medium);
+    color: var(--color-text-primary);
+    font-family: var(--font-sans);
+    outline: none;
+    cursor: pointer;
+    appearance: none;
+    -webkit-appearance: none;
+}
+.rxv-cat-select:focus { border-color: var(--color-accent); }
+
+/* ── Sticky confirm footer ── */
+.rxv-footer {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: var(--space-3) var(--space-4);
+    padding-bottom: calc(var(--space-3) + env(safe-area-inset-bottom, 0px));
+    background: var(--color-surface);
+    border-top: 1px solid var(--color-border);
+    z-index: var(--z-sticky);
+}
+.rxv-confirm-btn {
+    width: 100%;
+    height: 52px;
+    background: var(--color-accent);
+    color: #fff;
+    border: none;
+    border-radius: var(--radius-xl);
+    font-size: var(--text-base);
+    font-weight: var(--weight-semibold);
+    font-family: var(--font-sans);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    transition: opacity var(--duration-fast) var(--ease-standard),
+                background var(--duration-fast) var(--ease-standard);
+}
+.rxv-confirm-btn:disabled { opacity: 0.45; cursor: not-allowed; }

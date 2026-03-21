@@ -1,5 +1,5 @@
 import { useNavigate, useLocation } from "react-router-dom";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Icon } from "@/components/common/Icon";
 
 /* ─── Types ─── */
@@ -18,17 +18,29 @@ const INPUT_METHODS = [
     { key: "manual",  label: "Nhập thủ công",        icon: "edit",         desc: "Điền thông tin bằng tay",  highlighted: false },
 ];
 
-/* ─── Combined Sheet: chọn loại → chọn phương thức ─── */
-function TxSheet({ onClose }: { onClose: () => void }) {
+/* ─── TxSheet ─── */
+function TxSheet({
+    onClose,
+    onCameraSelect,
+    onGallerySelect,
+}: {
+    onClose: () => void;
+    onCameraSelect: (type: TxType) => void;
+    onGallerySelect: (type: TxType) => void;
+}) {
     const navigate = useNavigate();
     const [selectedType, setSelectedType] = useState<TxType | null>(null);
 
     function handleMethodSelect(key: string) {
+        if (!selectedType) return;
         onClose();
-        if (key === "manual" && selectedType) {
+        if (key === "manual") {
             navigate(`/add-transaction?type=${selectedType}`);
+        } else if (key === "camera") {
+            onCameraSelect(selectedType);
+        } else if (key === "gallery") {
+            onGallerySelect(selectedType);
         }
-        // camera / gallery: TODO
     }
 
     const txOpt = selectedType ? TX_OPTIONS.find((o) => o.type === selectedType)! : null;
@@ -39,7 +51,6 @@ function TxSheet({ onClose }: { onClose: () => void }) {
             <div className="sheet">
                 <div className="sheet__handle" />
 
-                {/* Header with optional back button */}
                 <div className="sheet__title-row">
                     {selectedType && (
                         <button
@@ -103,6 +114,11 @@ export const BottomNav = () => {
     const { pathname }  = useLocation();
     const [fabOpen, setFabOpen] = useState(false);
 
+    // Hidden file inputs for camera and gallery
+    const cameraInputRef  = useRef<HTMLInputElement>(null);
+    const galleryInputRef = useRef<HTMLInputElement>(null);
+    const pendingTypeRef  = useRef<TxType | null>(null);
+
     function isActive(path: string) {
         if (path === "/") return pathname === "/";
         return pathname.startsWith(path);
@@ -110,8 +126,45 @@ export const BottomNav = () => {
 
     function closeFab() { setFabOpen(false); }
 
+    function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+        const file = e.target.files?.[0];
+        if (file && pendingTypeRef.current) {
+            navigate("/receipt-review", { state: { file, type: pendingTypeRef.current } });
+        }
+        // Reset so the same file can be re-selected
+        e.target.value = "";
+    }
+
+    function handleCameraSelect(type: TxType) {
+        pendingTypeRef.current = type;
+        // Slight delay so the sheet can unmount before triggering the input
+        setTimeout(() => cameraInputRef.current?.click(), 120);
+    }
+
+    function handleGallerySelect(type: TxType) {
+        pendingTypeRef.current = type;
+        setTimeout(() => galleryInputRef.current?.click(), 120);
+    }
+
     return (
         <>
+            {/* Hidden file inputs — must live outside the sheet so they persist after sheet unmounts */}
+            <input
+                ref={galleryInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/heic,application/pdf"
+                style={{ display: "none" }}
+                onChange={handleFileChange}
+            />
+            <input
+                ref={cameraInputRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                style={{ display: "none" }}
+                onChange={handleFileChange}
+            />
+
             <nav className="bottom-nav" aria-label="Điều hướng chính">
                 {/* Trang chủ */}
                 <button
@@ -161,7 +214,13 @@ export const BottomNav = () => {
                 </button>
             </nav>
 
-            {fabOpen && <TxSheet onClose={closeFab} />}
+            {fabOpen && (
+                <TxSheet
+                    onClose={closeFab}
+                    onCameraSelect={handleCameraSelect}
+                    onGallerySelect={handleGallerySelect}
+                />
+            )}
         </>
     );
 };

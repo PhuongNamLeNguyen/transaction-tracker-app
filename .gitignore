@@ -1,0 +1,21 @@
+# Environment variables — NEVER commit these
+.env
+.env.local
+.env.*.local
+backend/.env
+frontend/.env
+
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+build/
+
+# Uploads (user-generated files)
+backend/uploads/
+
+# OS & editor
+.DS_Store
+*.suo
+.idea/

@@ -1,4 +1,4 @@
-import { query } from "../db/client";
+import { query, pool } from "../db/client";
 
 export const transactionsRepo = {
     /* ─── List transactions for a given month ─── */
@@ -139,6 +139,163 @@ export const transactionsRepo = {
             [userId, currency],
         );
         return created.rows[0];
+    },
+
+    /* ─── Create a receipt-scan transaction with multiple splits (pg transaction) ─── */
+    createFromReceipt: async (params: {
+        userId: string;
+        accountId: string;
+        type: string;
+        amount: number;
+        currency: string;
+        transactionDate: string;
+        receiptId: string;
+        note?: string;
+        items: { categoryId: string; amount: number }[];
+    }) => {
+        const { userId, accountId, type, amount, currency, transactionDate, receiptId, note, items } =
+            params;
+        const client = await pool.connect();
+        try {
+            await client.query("BEGIN");
+
+            const txResult = await client.query(
+                `INSERT INTO transactions
+                   (user_id, account_id, type, amount, currency, status, source, transaction_date, note)
+                 VALUES ($1, $2, $3, $4, $5, 'confirmed', 'receipt_scan', $6, $7)
+                 RETURNING id, type, amount, currency, transaction_date, note, created_at`,
+                [userId, accountId, type, amount, currency, transactionDate, note ?? null],
+            );
+            const tx = txResult.rows[0];
+
+            for (const item of items) {
+                await client.query(
+                    `INSERT INTO transaction_splits (transaction_id, category_id, amount)
+                     VALUES ($1, $2, $3)`,
+                    [tx.id, item.categoryId, item.amount],
+                );
+            }
+
+            await client.query(`UPDATE receipts SET transaction_id = $1 WHERE id = $2`, [
+                tx.id,
+                receiptId,
+            ]);
+
+            await client.query("COMMIT");
+            return tx;
+        } catch (err) {
+            await client.query("ROLLBACK");
+            throw err;
+        } finally {
+            client.release();
+        }
+    },
+
+    /* ─── Soft-delete a split (sets deleted_at = now()) ─── */
+    softDeleteSplit: async (userId: string, transactionId: string, splitId: string) => {
+        const result = await query(
+            `UPDATE transaction_splits ts
+             SET    deleted_at = now()
+             FROM   transactions t
+             WHERE  ts.id             = $1
+               AND  ts.transaction_id = $2
+               AND  ts.deleted_at     IS NULL
+               AND  t.id              = ts.transaction_id
+               AND  t.user_id         = $3
+             RETURNING ts.id`,
+            [splitId, transactionId, userId],
+        );
+        return result.rows[0] ?? null;
+    },
+
+    /* ─── Hard-delete a single split (must already be soft-deleted) ─── */
+    hardDeleteSplit: async (userId: string, transactionId: string, splitId: string) => {
+        const result = await query(
+            `DELETE FROM transaction_splits ts
+             USING transactions t
+             WHERE  ts.id             = $1
+               AND  ts.transaction_id = $2
+               AND  ts.deleted_at     IS NOT NULL
+               AND  t.id              = ts.transaction_id
+               AND  t.user_id         = $3
+             RETURNING ts.id`,
+            [splitId, transactionId, userId],
+        );
+        return result.rows[0] ?? null;
+    },
+
+    /* ─── Bulk hard-delete splits (must all be soft-deleted and belong to user) ─── */
+    bulkHardDeleteSplits: async (userId: string, splitIds: string[]) => {
+        if (splitIds.length === 0) return 0;
+        const result = await query(
+            `DELETE FROM transaction_splits ts
+             USING transactions t
+             WHERE  ts.id         = ANY($1::uuid[])
+               AND  ts.deleted_at IS NOT NULL
+               AND  t.id          = ts.transaction_id
+               AND  t.user_id     = $2`,
+            [splitIds, userId],
+        );
+        return result.rowCount ?? 0;
+    },
+
+    /* ─── Restore a single soft-deleted split ─── */
+    restoreSplit: async (userId: string, transactionId: string, splitId: string) => {
+        const result = await query(
+            `UPDATE transaction_splits ts
+             SET    deleted_at = NULL, updated_at = now()
+             FROM   transactions t
+             WHERE  ts.id             = $1
+               AND  ts.transaction_id = $2
+               AND  ts.deleted_at     IS NOT NULL
+               AND  t.id              = ts.transaction_id
+               AND  t.user_id         = $3
+             RETURNING ts.id`,
+            [splitId, transactionId, userId],
+        );
+        return result.rows[0] ?? null;
+    },
+
+    /* ─── Bulk restore soft-deleted splits ─── */
+    bulkRestoreSplits: async (userId: string, splitIds: string[]) => {
+        if (splitIds.length === 0) return 0;
+        const result = await query(
+            `UPDATE transaction_splits ts
+             SET    deleted_at = NULL, updated_at = now()
+             FROM   transactions t
+             WHERE  ts.id         = ANY($1::uuid[])
+               AND  ts.deleted_at IS NOT NULL
+               AND  t.id          = ts.transaction_id
+               AND  t.user_id     = $2`,
+            [splitIds, userId],
+        );
+        return result.rowCount ?? 0;
+    },
+
+    /* ─── List all soft-deleted splits for a user ─── */
+    getDeletedSplits: async (userId: string) => {
+        const result = await query(
+            `SELECT
+               ts.id,
+               ts.amount,
+               ts.deleted_at,
+               ts.transaction_id,
+               t.type            AS transaction_type,
+               t.currency,
+               t.transaction_date,
+               c.id              AS category_id,
+               c.name            AS category_name,
+               c.icon            AS category_icon
+             FROM   transaction_splits ts
+             JOIN   transactions t  ON t.id  = ts.transaction_id
+             JOIN   categories   c  ON c.id  = ts.category_id
+             WHERE  t.user_id     = $1
+               AND  ts.deleted_at IS NOT NULL
+               AND  t.deleted_at  IS NULL
+             ORDER BY ts.deleted_at DESC`,
+            [userId],
+        );
+        return result.rows;
     },
 
     /* ─── Create a manual transaction with a single split ─── */

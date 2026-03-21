@@ -5,12 +5,22 @@ import { sendSuccess } from "../utils/response";
 import { AppError } from "../utils/AppError";
 import { transactionsRepo } from "../repositories/transactions.repo";
 
-const createTransactionSchema = z.object({
+const createManualSchema = z.object({
     type: z.enum(["income", "expense", "investment", "saving"]),
     amount: z.number().positive(),
     transactionDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
     categoryId: z.string().uuid(),
     note: z.string().max(500).optional(),
+});
+
+const createReceiptSchema = z.object({
+    type: z.enum(["income", "expense", "investment", "saving"]),
+    transactionDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    receiptId: z.string().uuid(),
+    note: z.string().max(500).optional(),
+    items: z
+        .array(z.object({ categoryId: z.string().uuid(), amount: z.number().positive() }))
+        .min(1),
 });
 
 export const transactionsController = {
@@ -63,17 +73,59 @@ export const transactionsController = {
         sendSuccess(res, categories);
     }),
 
-    /** POST /transactions */
+    /** POST /transactions — supports manual entry and receipt_scan */
     create: asyncHandler(async (req: Request, res: Response) => {
-        const parsed = createTransactionSchema.safeParse(req.body);
+        const userId = req.user!.id;
+
+        // Receipt-scan path: body contains receiptId + items[]
+        if (req.body.receiptId) {
+            const parsed = createReceiptSchema.safeParse(req.body);
+            if (!parsed.success) {
+                throw new AppError(
+                    parsed.error.issues[0]?.message ?? "Invalid input",
+                    400,
+                    "VALIDATION_ERROR",
+                );
+            }
+            const { type, transactionDate, receiptId, note, items } = parsed.data;
+            const totalAmount = items.reduce((sum, i) => sum + i.amount, 0);
+
+            const account = await transactionsRepo.getUserAccount(userId);
+            const tx = await transactionsRepo.createFromReceipt({
+                userId,
+                accountId: account.id,
+                type,
+                amount: totalAmount,
+                currency: account.currency,
+                transactionDate,
+                receiptId,
+                note,
+                items,
+            });
+
+            res.status(201).json({
+                success: true,
+                data: {
+                    id: tx.id,
+                    type: tx.type,
+                    amount: Number(tx.amount),
+                    currency: tx.currency,
+                    transactionDate: tx.transaction_date,
+                    note: tx.note ?? null,
+                    createdAt: tx.created_at,
+                },
+            });
+            return;
+        }
+
+        // Manual entry path
+        const parsed = createManualSchema.safeParse(req.body);
         if (!parsed.success) {
             throw new AppError(parsed.error.issues[0]?.message ?? "Invalid input", 400, "VALIDATION_ERROR");
         }
         const { type, amount, transactionDate, categoryId, note } = parsed.data;
-        const userId = req.user!.id;
 
         const account = await transactionsRepo.getUserAccount(userId);
-
         const tx = await transactionsRepo.create({
             userId,
             accountId: account.id,
@@ -97,6 +149,74 @@ export const transactionsController = {
                 createdAt: tx.created_at,
             },
         });
+    }),
+
+    /** DELETE /transactions/:id/splits/:splitId — soft-delete */
+    deleteSplit: asyncHandler(async (req: Request, res: Response) => {
+        const userId = req.user!.id;
+        const { id: transactionId, splitId } = req.params;
+        const deleted = await transactionsRepo.softDeleteSplit(userId, transactionId, splitId);
+        if (!deleted) throw new AppError("Split not found", 404, "RESOURCE_NOT_FOUND");
+        sendSuccess(res, { success: true });
+    }),
+
+    /** DELETE /transactions/:id/splits/:splitId/permanent — hard-delete */
+    hardDeleteSplit: asyncHandler(async (req: Request, res: Response) => {
+        const userId = req.user!.id;
+        const { id: transactionId, splitId } = req.params;
+        const deleted = await transactionsRepo.hardDeleteSplit(userId, transactionId, splitId);
+        if (!deleted) throw new AppError("Split not found or not deleted", 404, "RESOURCE_NOT_FOUND");
+        sendSuccess(res, { success: true });
+    }),
+
+    /** DELETE /transactions/splits/permanent — bulk hard-delete */
+    bulkHardDeleteSplits: asyncHandler(async (req: Request, res: Response) => {
+        const userId = req.user!.id;
+        const { splitIds } = req.body as { splitIds?: unknown };
+        if (!Array.isArray(splitIds) || splitIds.length === 0) {
+            throw new AppError("splitIds must be a non-empty array", 400, "VALIDATION_ERROR");
+        }
+        const count = await transactionsRepo.bulkHardDeleteSplits(userId, splitIds as string[]);
+        sendSuccess(res, { deleted: count });
+    }),
+
+    /** PATCH /transactions/:id/splits/:splitId/restore — restore */
+    restoreSplit: asyncHandler(async (req: Request, res: Response) => {
+        const userId = req.user!.id;
+        const { id: transactionId, splitId } = req.params;
+        const restored = await transactionsRepo.restoreSplit(userId, transactionId, splitId);
+        if (!restored) throw new AppError("Split not found or not deleted", 404, "RESOURCE_NOT_FOUND");
+        sendSuccess(res, { success: true });
+    }),
+
+    /** PATCH /transactions/splits/restore — bulk restore */
+    bulkRestoreSplits: asyncHandler(async (req: Request, res: Response) => {
+        const userId = req.user!.id;
+        const { splitIds } = req.body as { splitIds?: unknown };
+        if (!Array.isArray(splitIds) || splitIds.length === 0) {
+            throw new AppError("splitIds must be a non-empty array", 400, "VALIDATION_ERROR");
+        }
+        const count = await transactionsRepo.bulkRestoreSplits(userId, splitIds as string[]);
+        sendSuccess(res, { restored: count });
+    }),
+
+    /** GET /transactions/splits/deleted — list soft-deleted splits */
+    getDeletedSplits: asyncHandler(async (req: Request, res: Response) => {
+        const userId = req.user!.id;
+        const rows = await transactionsRepo.getDeletedSplits(userId);
+        const splits = rows.map((r) => ({
+            id: r.id,
+            transactionId: r.transaction_id,
+            transactionType: r.transaction_type,
+            amount: Number(r.amount),
+            currency: r.currency,
+            transactionDate: r.transaction_date,
+            categoryId: r.category_id,
+            categoryName: r.category_name,
+            categoryIcon: r.category_icon ?? null,
+            deletedAt: r.deleted_at,
+        }));
+        sendSuccess(res, { splits });
     }),
 
     /** GET /transactions/:id */

@@ -230,16 +230,26 @@ export const receiptsController = {
 
             sendSuccess(res, { suggestion, confidenceLevel });
         } catch (err) {
-            // Mark receipt as error (only if AppError is not already about receipt not found)
+            // Silently try to mark receipt as error — never let this secondary DB call
+            // mask the original error with a cascade failure.
             const code = err instanceof AppError ? err.code : "AI_PROCESSING_FAILED";
             if (code !== "RESOURCE_NOT_FOUND") {
-                await receiptsRepo.updateOcrStatus(receiptId, "error", {
-                    scanData: { errorCode: code, errorDetail: String(err) },
-                });
+                try {
+                    await receiptsRepo.updateOcrStatus(receiptId, "error", {
+                        scanData: { errorCode: code, errorDetail: String(err) },
+                    });
+                } catch {
+                    // Ignore — the original error below is what the client needs to see
+                }
             }
+
+            if (process.env.NODE_ENV !== "production") {
+                console.error("[receipts/scan] pipeline error:", err);
+            }
+
             if (err instanceof AppError) throw err;
             throw new AppError(
-                "Something went wrong reading your receipt. Please try again or use manual entry.",
+                "Không thể đọc hóa đơn. Vui lòng thử lại hoặc nhập thủ công.",
                 500,
                 "AI_PROCESSING_FAILED",
             );
