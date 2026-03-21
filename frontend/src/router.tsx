@@ -5,6 +5,7 @@ import { LoginPage } from "@/pages/LoginPage";
 import { RegisterPage } from "@/pages/RegisterPage";
 import { DashboardPage } from "@/pages/DashboardPage";
 import { OnboardingPage } from "@/pages/OnboardingPage";
+import { TransactionsPage } from "@/pages/TransactionsPage";
 
 /*
   Route structure:
@@ -26,10 +27,10 @@ export const router = createBrowserRouter([
     {
         element: <ProtectedRoute />,
         children: [
-            { path: "/onboarding", element: <OnboardingPage /> },
-            { path: "/", element: <DashboardPage /> },
+            { path: "/onboarding",    element: <OnboardingPage /> },
+            { path: "/",              element: <DashboardPage /> },
+            { path: "/transactions",  element: <TransactionsPage /> },
             // Các route sau sẽ thêm dần theo từng feature:
-            // { path: '/transactions',     element: <TransactionsPage /> },
             // { path: '/transactions/:id', element: <TransactionDetailPage /> },
             // { path: '/accounts',         element: <AccountsPage /> },
             // { path: '/budgets',          element: <BudgetsPage /> },

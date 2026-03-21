@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import {
     dashboardApi,
@@ -238,6 +239,7 @@ function BottomNav({
     fabOpen: boolean;
     onFabClick: () => void;
 }) {
+    const navigate = useNavigate();
     return (
         <nav className="bottom-nav" aria-label="Điều hướng chính">
             {/* Trang chủ */}
@@ -251,7 +253,7 @@ function BottomNav({
             </button>
 
             {/* Chi tiết */}
-            <button className="bottom-nav__item">
+            <button className="bottom-nav__item" onClick={() => navigate("/transactions")}>
                 <svg width="22" height="22" fill="none" viewBox="0 0 24 24">
                     <rect x="3" y="4" width="18" height="16" rx="2" stroke="currentColor" strokeWidth="2"/>
                     <path d="M3 9h18" stroke="currentColor" strokeWidth="2"/>
