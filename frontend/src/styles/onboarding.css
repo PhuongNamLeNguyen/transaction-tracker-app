@@ -1,0 +1,400 @@
+/* ─── Onboarding Wizard ─────────────────────────────────────── */
+
+.ob-page {
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    padding: 28px 24px 32px;
+    background: var(--color-bg, #fff);
+}
+
+/* ─── Header ─── */
+.ob-header {
+    display: flex;
+    align-items: center;
+    min-height: 36px;
+    margin-bottom: 20px;
+}
+
+.ob-back {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 6px;
+    color: var(--color-text-primary, #1a1a1a);
+    display: flex;
+    align-items: center;
+    border-radius: 8px;
+    transition: background 0.15s;
+}
+.ob-back:hover {
+    background: #f3f4f6;
+}
+
+/* ─── Title ─── */
+.ob-title {
+    font-size: 1.35rem;
+    font-weight: 700;
+    color: var(--color-accent, #f97316);
+    text-align: center;
+    margin-bottom: 28px;
+    line-height: 1.3;
+}
+
+/* ─── Content area ─── */
+.ob-content {
+    flex: 1;
+}
+
+.ob-label {
+    font-size: 0.9rem;
+    color: var(--color-text-primary, #1a1a1a);
+    margin-bottom: 10px;
+    font-weight: 500;
+}
+
+/* ─── Select / Dropdown ─── */
+.ob-select-wrapper {
+    position: relative;
+    margin-bottom: 24px;
+}
+
+.ob-select {
+    width: 100%;
+    padding: 14px 48px 14px 18px;
+    border: 1.5px solid #d1d5db;
+    border-radius: 99px;
+    background: #fff;
+    font-size: 0.95rem;
+    color: var(--color-text-primary, #1a1a1a);
+    appearance: none;
+    -webkit-appearance: none;
+    cursor: pointer;
+    transition: border-color 0.15s;
+}
+.ob-select:focus {
+    outline: none;
+    border-color: var(--color-accent, #f97316);
+}
+
+.ob-select-icon {
+    position: absolute;
+    right: 18px;
+    top: 50%;
+    transform: translateY(-50%);
+    pointer-events: none;
+    color: #9ca3af;
+}
+
+/* ─── FAQ Accordion ─── */
+.ob-faq {
+    margin-top: 4px;
+}
+
+.ob-faq-trigger {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--color-accent, #f97316);
+    font-size: 0.875rem;
+    font-weight: 600;
+    text-decoration: underline;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 0;
+}
+
+.ob-faq-body {
+    margin-top: 12px;
+    font-size: 0.85rem;
+    color: var(--color-text-secondary, #6b7280);
+    line-height: 1.65;
+    padding-left: 4px;
+}
+
+.ob-faq-body p {
+    margin-bottom: 4px;
+}
+
+/* ─── Budget Table ─── */
+.ob-table-header {
+    display: flex;
+    justify-content: space-between;
+    padding: 0 12px 8px;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--color-accent, #f97316);
+}
+
+.ob-table-body {
+    max-height: 210px;
+    overflow-y: auto;
+    border: 1.5px solid #e5e7eb;
+    border-radius: 10px;
+}
+
+/* Custom orange scrollbar */
+.ob-table-body::-webkit-scrollbar {
+    width: 4px;
+}
+.ob-table-body::-webkit-scrollbar-track {
+    background: #f9fafb;
+    border-radius: 2px;
+}
+.ob-table-body::-webkit-scrollbar-thumb {
+    background: var(--color-accent, #f97316);
+    border-radius: 2px;
+}
+
+.ob-table-row {
+    display: flex;
+    align-items: center;
+    padding: 10px 12px;
+    gap: 8px;
+    border-bottom: 1px solid #f3f4f6;
+}
+.ob-table-row:last-child {
+    border-bottom: none;
+}
+
+.ob-table-name {
+    flex: 1;
+    font-size: 0.875rem;
+    color: var(--color-text-primary, #1a1a1a);
+}
+
+.ob-amount-input {
+    width: 110px;
+    text-align: right;
+    border: none;
+    outline: none;
+    font-size: 0.875rem;
+    color: var(--color-text-primary, #1a1a1a);
+    background: transparent;
+    font-family: inherit;
+}
+.ob-amount-input::placeholder {
+    color: #9ca3af;
+}
+.ob-amount-input.has-error {
+    color: #ef4444;
+}
+
+.ob-remove-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: #d1d5db;
+    padding: 2px 4px;
+    display: flex;
+    align-items: center;
+    border-radius: 4px;
+    transition: color 0.15s;
+    font-size: 16px;
+    line-height: 1;
+}
+.ob-remove-btn:hover {
+    color: #ef4444;
+}
+
+/* ─── Add button ─── */
+.ob-add-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 12px;
+    padding: 7px 16px;
+    border: 1.5px solid #d1d5db;
+    border-radius: 99px;
+    background: #fff;
+    font-size: 0.85rem;
+    cursor: pointer;
+    color: var(--color-text-primary, #1a1a1a);
+    font-family: inherit;
+    transition: border-color 0.15s, color 0.15s;
+}
+.ob-add-btn:hover {
+    border-color: var(--color-accent, #f97316);
+    color: var(--color-accent, #f97316);
+}
+
+/* ─── Total row ─── */
+.ob-total-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 12px 0;
+    font-size: 0.875rem;
+}
+.ob-total-label {
+    color: var(--color-text-primary, #1a1a1a);
+    font-weight: 500;
+}
+.ob-total-value {
+    color: var(--color-accent, #f97316);
+    font-weight: 700;
+    font-size: 1rem;
+}
+
+/* ─── Validation error ─── */
+.ob-error-msg {
+    color: #ef4444;
+    font-size: 0.8rem;
+    margin-top: 10px;
+}
+
+/* ─── Category picker (bottom sheet) ─── */
+.ob-picker-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.35);
+    z-index: 100;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+}
+
+.ob-picker-sheet {
+    width: 100%;
+    max-width: var(--bp-md, 430px);
+    background: #fff;
+    border-radius: 20px 20px 0 0;
+    padding: 20px 20px 32px;
+    max-height: 55dvh;
+    display: flex;
+    flex-direction: column;
+}
+
+.ob-picker-title {
+    font-weight: 700;
+    font-size: 1rem;
+    margin-bottom: 14px;
+    color: var(--color-text-primary, #1a1a1a);
+}
+
+.ob-picker-list {
+    overflow-y: auto;
+    flex: 1;
+}
+
+.ob-picker-item {
+    padding: 13px 8px;
+    border-bottom: 1px solid #f3f4f6;
+    cursor: pointer;
+    font-size: 0.9rem;
+    color: var(--color-text-primary, #1a1a1a);
+    transition: background 0.1s, color 0.1s;
+}
+.ob-picker-item:last-child {
+    border-bottom: none;
+}
+.ob-picker-item:hover {
+    background: #fff7ed;
+    color: var(--color-accent, #f97316);
+}
+
+.ob-picker-empty {
+    font-size: 0.875rem;
+    color: #9ca3af;
+    padding: 12px 8px;
+}
+
+/* ─── Review (Step 4) ─── */
+.ob-review-field {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    margin-bottom: 10px;
+    font-size: 0.9rem;
+}
+.ob-review-label {
+    color: var(--color-text-primary, #1a1a1a);
+    font-weight: 500;
+    white-space: nowrap;
+}
+.ob-review-value {
+    color: var(--color-accent, #f97316);
+    font-weight: 700;
+}
+
+.ob-section-title {
+    font-size: 0.875rem;
+    font-weight: 500;
+    margin: 20px 0 10px;
+    color: var(--color-text-primary, #1a1a1a);
+}
+
+/* Review table (read-only, same look as edit table) */
+.ob-review-table {
+    border: 1.5px solid #e5e7eb;
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.ob-review-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 10px 12px;
+    font-size: 0.875rem;
+    border-bottom: 1px solid #f3f4f6;
+}
+.ob-review-row:last-child {
+    border-bottom: none;
+}
+.ob-review-row-name {
+    color: var(--color-text-primary, #1a1a1a);
+}
+.ob-review-row-amount {
+    color: var(--color-text-primary, #1a1a1a);
+    font-weight: 500;
+}
+
+/* ─── Footer (button + dots) ─── */
+.ob-footer {
+    margin-top: 28px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+}
+
+.ob-btn-primary {
+    width: 100%;
+    padding: 16px;
+    background: var(--color-accent, #f97316);
+    color: #fff;
+    border: none;
+    border-radius: 99px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+    transition: opacity 0.15s;
+}
+.ob-btn-primary:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+.ob-btn-primary:not(:disabled):hover {
+    opacity: 0.9;
+}
+
+/* ─── Step indicator dots ─── */
+.ob-dots {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.ob-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 99px;
+    background: #d1d5db;
+    transition: width 0.2s ease, background 0.2s ease;
+}
+.ob-dot.ob-dot--active {
+    width: 28px;
+    background: var(--color-accent, #f97316);
+}

@@ -145,27 +145,20 @@ export const authService = {
             user: {
                 id: user.id,
                 email: user.email,
+                name: user.name ?? "",
                 isVerified: user.is_verified,
             },
         };
     },
 
     // Refresh → verify cookie token, rotate session, trả access token mới
-    refresh: async (rawRefreshToken: string, userId: string) => {
-        const session = await sessionRepo.findActiveSession(userId);
+    refresh: async (rawRefreshToken: string) => {
+        const session = await sessionRepo.findActiveSessionByToken(rawRefreshToken);
         if (!session) {
             throw new AppError("Invalid refresh token", 401, "UNAUTHORIZED");
         }
 
-        const valid = await bcrypt.compare(
-            rawRefreshToken,
-            session.refresh_token_hash,
-        );
-        if (!valid) {
-            throw new AppError("Invalid refresh token", 401, "UNAUTHORIZED");
-        }
-
-        const user = await userRepo.findById(userId);
+        const user = await userRepo.findById(session.user_id);
         if (!user) {
             throw new AppError("User not found", 401, "UNAUTHORIZED");
         }
@@ -186,6 +179,7 @@ export const authService = {
             user: {
                 id: user.id,
                 email: user.email,
+                name: user.name ?? "",
                 isVerified: user.is_verified,
             },
         };

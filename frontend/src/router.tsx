@@ -4,11 +4,13 @@ import { PublicRoute } from "@/components/common/PublicRoute";
 import { LoginPage } from "@/pages/LoginPage";
 import { RegisterPage } from "@/pages/RegisterPage";
 import { DashboardPage } from "@/pages/DashboardPage";
+import { OnboardingPage } from "@/pages/OnboardingPage";
 
 /*
   Route structure:
   /login, /register     → PublicRoute  (đã login rồi → redirect về /)
-  /, /transactions, ... → ProtectedRoute (chưa login → redirect về /login)
+  /, /onboarding, ...   → ProtectedRoute (chưa login → redirect về /login)
+                          (chưa onboard → redirect về /onboarding)
 */
 export const router = createBrowserRouter([
     /* ── Public routes (chỉ truy cập khi chưa đăng nhập) ── */
@@ -24,6 +26,7 @@ export const router = createBrowserRouter([
     {
         element: <ProtectedRoute />,
         children: [
+            { path: "/onboarding", element: <OnboardingPage /> },
             { path: "/", element: <DashboardPage /> },
             // Các route sau sẽ thêm dần theo từng feature:
             // { path: '/transactions',     element: <TransactionsPage /> },

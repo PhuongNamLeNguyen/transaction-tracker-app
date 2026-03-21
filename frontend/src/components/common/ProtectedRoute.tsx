@@ -1,9 +1,7 @@
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth.ts";
 
-/* ─── Loading Screen ───
-   Hiển thị khi đang silent refresh — tránh flash redirect về /login
-*/
+/* ─── Loading Screen ─── */
 const LoadingScreen = () => (
     <div
         style={{
@@ -48,24 +46,34 @@ const LoadingScreen = () => (
 );
 
 /* ─── ProtectedRoute ───
-   - loading     → hiển thị LoadingScreen (chờ silent refresh xong)
-   - authenticated → render children (Outlet)
-   - unauthenticated → redirect về /login, giữ lại URL gốc trong state
+   Flow:
+   1. loading / isOnboarded=null  → LoadingScreen (chờ auth + onboarding check)
+   2. unauthenticated              → /login
+   3. authenticated + not onboarded + not on /onboarding → /onboarding
+   4. otherwise                   → render children
 */
 export const ProtectedRoute = () => {
-    const { status } = useAuth();
+    const { status, isOnboarded } = useAuth();
     const location = useLocation();
 
-    if (status === "loading") return <LoadingScreen />;
+    // Still determining auth or onboarding status
+    if (status === "loading" || (status === "authenticated" && isOnboarded === null)) {
+        return <LoadingScreen />;
+    }
 
     if (status === "unauthenticated") {
         return (
             <Navigate
                 to="/login"
                 replace
-                state={{ from: location }} // để sau khi login có thể redirect về đúng trang
+                state={{ from: location }}
             />
         );
+    }
+
+    // Redirect to onboarding wizard if setup not done
+    if (isOnboarded === false && location.pathname !== "/onboarding") {
+        return <Navigate to="/onboarding" replace />;
     }
 
     return <Outlet />;

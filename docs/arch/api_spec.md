@@ -45,8 +45,12 @@ JWT is issued by the backend upon login and verified on every protected request 
 | Method | Endpoint | Auth required | Description |
 | --- | --- | --- | --- |
 | POST | `/auth/register` | No | Register a new account and send verification email |
-| POST | `/auth/login` | No | Login and receive a JWT |
-| POST | `/auth/verify-status` | No | Check email verification status |
+| POST | `/auth/login` | No | Login and receive access + refresh tokens |
+| POST | `/auth/verify-email` | No | Verify email address with rawToken from console |
+| POST | `/auth/refresh` | No (cookie) | Issue new access token from HttpOnly refresh cookie |
+| POST | `/auth/logout` | Yes (Bearer) | Revoke all sessions for the user |
+| POST | `/auth/forgot-password` | No | Request a password reset token |
+| POST | `/auth/reset-password` | No | Reset password and revoke all sessions |
 
 **Flow:**
 

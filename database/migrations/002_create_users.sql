@@ -38,7 +38,7 @@ CREATE TABLE user_settings (
   user_id          uuid        PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
   theme            text        NOT NULL DEFAULT 'light'
                                CHECK (theme IN ('light', 'dark')),
-  cycle_start_day  date,
+  cycle_start_day  integer,
   target_currency  text        NOT NULL DEFAULT 'JPY',
   system_language  text        NOT NULL DEFAULT 'en',
   time_zone        text        NOT NULL DEFAULT 'Asia/Tokyo',

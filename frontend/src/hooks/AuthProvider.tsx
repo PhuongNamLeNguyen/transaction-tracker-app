@@ -5,17 +5,27 @@ import {
     type AuthStatus,
 } from "@/hooks/AuthContext";
 import { authApi, type RefreshResponse } from "@/api/auth.api";
+import { onboardingApi } from "@/api/onboarding.api";
 import { setToken, clearToken } from "@/utils/token-utils";
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const [user, setUser] = useState<AuthUser | null>(null);
     const [status, setStatus] = useState<AuthStatus>("loading");
+    const [isOnboarded, setIsOnboarded] = useState<boolean | null>(null);
 
-    /* ── Silent refresh khi app khởi động ──
-     Backend: authService.refresh(rawRefreshToken, userId)
-     - Đọc HttpOnly cookie tự động (credentials: include)
-     - Trả: { accessToken, refreshToken, user } — KHÔNG có rememberMe
-  */
+    /* ── Kiểm tra onboarding status sau khi có access token ──
+       Nếu API không tồn tại (chưa deploy) → fallback assume đã onboard
+    */
+    const checkOnboarding = useCallback(async () => {
+        try {
+            const { needsSetup } = await onboardingApi.getStatus();
+            setIsOnboarded(!needsSetup);
+        } catch {
+            setIsOnboarded(true); // fallback: assume onboarded
+        }
+    }, []);
+
+    /* ── Silent refresh khi app khởi động ── */
     useEffect(() => {
         let cancelled = false;
 
@@ -27,14 +37,17 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
                 setUser({
                     id: res.user.id,
                     email: res.user.email,
+                    name: res.user.name ?? "",
                     isVerified: res.user.isVerified,
                 });
+                await checkOnboarding();
+                if (cancelled) return;
                 setStatus("authenticated");
             } catch {
-                // Cookie hết hạn / không tồn tại → backend throw UNAUTHORIZED
                 if (cancelled) return;
                 clearToken();
                 setUser(null);
+                setIsOnboarded(null);
                 setStatus("unauthenticated");
             }
         };
@@ -43,18 +56,30 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         return () => {
             cancelled = true;
         };
+    }, [checkOnboarding]);
+
+    /* ── Login — gọi sau khi login thành công ──
+       Sync state updates happen before await so ProtectedRoute
+       sees status="authenticated" + isOnboarded=null (shows loading)
+       while onboarding check resolves in background.
+    */
+    const login = useCallback(
+        (authUser: AuthUser) => {
+            setUser(authUser);
+            setIsOnboarded(null); // unknown until checked
+            setStatus("authenticated");
+            // Fire-and-forget: check onboarding, then reveal
+            checkOnboarding();
+        },
+        [checkOnboarding],
+    );
+
+    /* ── completeOnboarding — gọi sau khi wizard hoàn tất ── */
+    const completeOnboarding = useCallback(() => {
+        setIsOnboarded(true);
     }, []);
 
-    /* ── Login — gọi sau khi login thành công để sync auth state ── */
-    const login = useCallback((authUser: AuthUser) => {
-        setUser(authUser);
-        setStatus("authenticated");
-    }, []);
-
-    /* ── Logout ──
-     Backend: authService.logout(userId) → revokeAllUserSessions
-     FE gửi Bearer token để backend xác định userId
-  */
+    /* ── Logout ── */
     const logout = useCallback(async () => {
         try {
             await authApi.logout();
@@ -63,12 +88,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         } finally {
             clearToken();
             setUser(null);
+            setIsOnboarded(null);
             setStatus("unauthenticated");
         }
     }, []);
 
     return (
-        <AuthContext.Provider value={{ user, status, login, logout }}>
+        <AuthContext.Provider
+            value={{ user, status, isOnboarded, login, logout, completeOnboarding }}
+        >
             {children}
         </AuthContext.Provider>
     );

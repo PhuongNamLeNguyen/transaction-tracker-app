@@ -74,10 +74,10 @@ const payload = jwt.verify(token, process.env.JWT_SECRET!) as JwtPayload
 **Refresh token cookie:**
 
 ```text
-Set-Cookie: refresh_token=<raw>; HttpOnly; Secure; SameSite=Strict; Path=/api/v1/auth/refresh; Max-Age=2592000
+Set-Cookie: refresh_token=<raw>; HttpOnly; SameSite=Lax; Path=/; Max-Age=2592000
 ```
 
-`HttpOnly` — not accessible via JavaScript. `Secure` — HTTPS only. `SameSite=Strict` — not sent on cross-site requests. `Path` scoped to the refresh endpoint only.
+`HttpOnly` — not accessible via JavaScript. `Secure` — set only in production (`NODE_ENV === "production"`). `SameSite=Lax` — blocks cross-site POST but allows top-level navigations. `Path=/` — sent on all requests to the backend.
 
 ---
 
@@ -92,7 +92,7 @@ POST /auth/register
   → INSERT INTO user_settings (defaults)
   → Generate verification token → hash → INSERT INTO verification_tokens (24hr expiry)
   → Send verification email
-  → 201 { success: true, data: { id, email } }
+  → 201 { success: true, data: { id, email, name } }
 ```
 
 Login is blocked until `is_verified = true`. Attempting login before verifying → `403 EMAIL_NOT_VERIFIED`.
@@ -102,7 +102,7 @@ Login is blocked until `is_verified = true`. Attempting login before verifying �
 ## 4. Email Verification Flow
 
 ```text
-GET /auth/verify-email?token=<raw>
+POST /auth/verify-email  { rawToken: "<raw>" }
   → Look up verification_tokens → compare hash → 400 if not found / already used / expired
   → SET users.is_verified = true
   → SET verification_tokens.expired_at = now()
@@ -139,6 +139,7 @@ POST /auth/login
   "success": true,
   "data": {
     "accessToken": "eyJ...",
+    "rememberMe": false,
     "user": { "id": "uuid", "email": "user@example.com", "isVerified": true }
   }
 }
@@ -188,14 +189,14 @@ Token expiry: **1 hour**. On success, all active sessions are revoked.
 ## 8. Logout Flow
 
 ```text
-POST /auth/logout
-  → Read refresh token from cookie
-  → SET sessions.revoked_at = now()
-  → Clear cookie (Set-Cookie: Max-Age=0)
+POST /auth/logout  (Authorization: Bearer <accessToken>)
+  → Extract user_id from JWT
+  → Revoke ALL active sessions for user (revokeAllUserSessions)
+  → Clear refresh_token cookie (Set-Cookie: Max-Age=0)
   → 200 OK
 ```
 
-The access token is stateless and cannot be server-side invalidated — it expires naturally after 15 minutes. The frontend must discard it from memory immediately on logout.
+Logout revokes every session for the user (not just the current device). The access token is stateless and cannot be server-side invalidated — it expires naturally after 15 minutes. The frontend must discard it from memory immediately on logout.
 
 ---
 
@@ -238,10 +239,9 @@ router.use(authenticate, requireVerified)
 | `POST /auth/register` | None |
 | `POST /auth/login` | None |
 | `POST /auth/refresh` | None (cookie) |
-| `GET /auth/verify-email` | None |
+| `POST /auth/verify-email` | None |
 | `POST /auth/forgot-password` | None |
 | `POST /auth/reset-password` | None |
-| `GET /auth/verify-status` | None |
 | `/transactions/*` | `authenticate` + `requireVerified` |
 | `/accounts/*` | `authenticate` + `requireVerified` |
 | `/receipts/*` | `authenticate` + `requireVerified` |

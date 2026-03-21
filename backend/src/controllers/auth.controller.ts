@@ -2,7 +2,6 @@ import { Request, Response } from "express";
 import { authService } from "../services/auth.service";
 import { asyncHandler } from "../utils/asyncHandler";
 import { sendSuccess } from "../utils/response";
-import { sessionRepo } from "../repositories/session.repo";
 
 const REFRESH_COOKIE_NAME = "refresh_token";
 const COOKIE_OPTIONS = {
@@ -71,20 +70,7 @@ export const authController = {
             });
         }
 
-        // rawToken là hex string (crypto.randomBytes) — không phải JWT
-        // Tìm session trong DB bằng bcrypt.compare
-        const session = await sessionRepo.findActiveSessionByToken(rawToken);
-        if (!session) {
-            throw Object.assign(new Error("Invalid refresh token"), {
-                statusCode: 401,
-                code: "UNAUTHORIZED",
-            });
-        }
-
-        const { accessToken, refreshToken, user } = await authService.refresh(
-            rawToken,
-            session.user_id,
-        );
+        const { accessToken, refreshToken, user } = await authService.refresh(rawToken);
 
         res.cookie(REFRESH_COOKIE_NAME, refreshToken, COOKIE_OPTIONS);
         sendSuccess(res, { accessToken, user });

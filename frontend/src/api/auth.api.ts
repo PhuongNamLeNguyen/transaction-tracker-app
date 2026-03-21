@@ -40,6 +40,7 @@ export interface LoginResponse {
     user: {
         id: string;
         email: string;
+        name: string;
         isVerified: boolean;
     };
 }
@@ -57,6 +58,7 @@ export interface RefreshResponse {
     user: {
         id: string;
         email: string;
+        name: string;
         isVerified: boolean;
     };
 }
