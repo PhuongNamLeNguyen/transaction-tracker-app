@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import { asyncHandler } from "../utils/asyncHandler";
 import { sendSuccess } from "../utils/response";
+import { AppError } from "../utils/AppError";
 import { dashboardRepo } from "../repositories/dashboard.repo";
 
 export const dashboardController = {
@@ -108,5 +109,53 @@ export const dashboardController = {
             budgetProgress,
             transactions,
         });
+    }),
+
+    /** GET /dashboard/expense-breakdown?year=&month= */
+    getExpenseBreakdown: asyncHandler(async (req: Request, res: Response) => {
+        const userId = req.user!.id;
+        const now = new Date();
+        const year  = parseInt(req.query.year  as string) || now.getFullYear();
+        const month = parseInt(req.query.month as string) || now.getMonth() + 1;
+
+        if (month < 1 || month > 12) throw new AppError("Invalid month", 400, "VALIDATION_ERROR");
+
+        const [rows, account] = await Promise.all([
+            dashboardRepo.getExpenseBreakdownByMonth(userId, year, month),
+            dashboardRepo.getAccountBalance(userId),
+        ]);
+
+        const currency = account?.currency ?? "VND";
+        const categories = rows.map((r) => ({
+            categoryId: r.category_id,
+            name:       r.category_name,
+            icon:       r.category_icon ?? null,
+            amount:     Number(r.total),
+            currency,
+        }));
+
+        sendSuccess(res, { categories, currency });
+    }),
+
+    /** GET /dashboard/cashflow?year=&month= */
+    getCashflow: asyncHandler(async (req: Request, res: Response) => {
+        const userId = req.user!.id;
+        const now = new Date();
+        const year  = parseInt(req.query.year  as string) || now.getFullYear();
+        const month = parseInt(req.query.month as string) || now.getMonth() + 1;
+
+        if (month < 1 || month > 12) throw new AppError("Invalid month", 400, "VALIDATION_ERROR");
+
+        const [summaryRows, account] = await Promise.all([
+            dashboardRepo.getSummaryByMonth(userId, year, month),
+            dashboardRepo.getAccountBalance(userId),
+        ]);
+
+        const cashflow = { income: 0, expense: 0, investment: 0, saving: 0, currency: account?.currency ?? "VND" };
+        for (const row of summaryRows) {
+            if (row.type in cashflow) (cashflow as Record<string, number>)[row.type] = Number(row.total);
+        }
+
+        sendSuccess(res, cashflow);
     }),
 };

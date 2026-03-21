@@ -117,13 +117,28 @@ export const transactionsRepo = {
         return result.rows;
     },
 
-    /* ─── Get user's primary account ─── */
+    /* ─── Get (or create) user's primary account ─── */
     getUserAccount: async (userId: string) => {
-        const result = await query(
+        const existing = await query(
             `SELECT id, currency, balance FROM accounts WHERE user_id = $1 LIMIT 1`,
             [userId],
         );
-        return result.rows[0] ?? null;
+        if (existing.rows[0]) return existing.rows[0];
+
+        // No account yet — derive currency from user_settings, default to VND
+        const settings = await query(
+            `SELECT target_currency FROM user_settings WHERE user_id = $1 LIMIT 1`,
+            [userId],
+        );
+        const currency = settings.rows[0]?.target_currency ?? "VND";
+
+        const created = await query(
+            `INSERT INTO accounts (user_id, name, type, currency, balance)
+             VALUES ($1, 'Ví chính', 'wallet', $2, 0)
+             RETURNING id, currency, balance`,
+            [userId, currency],
+        );
+        return created.rows[0];
     },
 
     /* ─── Create a manual transaction with a single split ─── */

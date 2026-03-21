@@ -104,4 +104,17 @@ export const onboardingRepo = {
             );
         }
     },
+
+    createDefaultAccountIfMissing: async (userId: string, currency: string) => {
+        const existing = await query(
+            `SELECT id FROM accounts WHERE user_id = $1 LIMIT 1`,
+            [userId],
+        );
+        if (existing.rows[0]) return;
+        await query(
+            `INSERT INTO accounts (user_id, name, type, currency, balance)
+             VALUES ($1, 'Ví chính', 'wallet', $2, 0)`,
+            [userId, currency],
+        );
+    },
 };

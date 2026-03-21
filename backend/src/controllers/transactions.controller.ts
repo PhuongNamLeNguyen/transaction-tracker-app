@@ -73,7 +73,6 @@ export const transactionsController = {
         const userId = req.user!.id;
 
         const account = await transactionsRepo.getUserAccount(userId);
-        if (!account) throw new AppError("No account found", 400, "VALIDATION_ERROR");
 
         const tx = await transactionsRepo.create({
             userId,

@@ -93,6 +93,9 @@ export const onboardingController = {
 
             // 3. Create budgets
             await onboardingRepo.createBudgets(period.id, budgets, targetCurrency);
+
+            // 4. Ensure user has a default account
+            await onboardingRepo.createDefaultAccountIfMissing(userId, targetCurrency);
         } catch (dbErr: unknown) {
             const msg = dbErr instanceof Error ? dbErr.message : String(dbErr);
             console.error("[onboarding.setup] DB error:", msg);

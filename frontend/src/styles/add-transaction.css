@@ -127,12 +127,6 @@
     letter-spacing: 0.05em;
 }
 
-.atx-amount-preview {
-    font-size: var(--text-sm);
-    font-weight: var(--weight-semibold);
-    margin-top: var(--space-1);
-}
-
 /* Field rows */
 .atx-field-row {
     display: flex;
@@ -218,10 +212,6 @@
     font-weight: var(--weight-semibold);
 }
 
-.atx-cat-chip__icon {
-    font-size: 16px;
-    line-height: 1;
-}
 .atx-cat-chip__name {
     font-size: var(--text-sm);
 }

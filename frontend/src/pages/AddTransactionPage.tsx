@@ -19,22 +19,14 @@ const TYPE_CONFIG: Record<
     saving:     { label: "Tiết kiệm", color: "var(--color-saving)",     icon: "savings" },
 };
 
-function formatCurrency(amount: number, currency: string): string {
-    return new Intl.NumberFormat("vi-VN", {
-        style: "currency",
-        currency: currency === "VND" ? "VND" : currency,
-        maximumFractionDigits: currency === "VND" ? 0 : 2,
-    }).format(amount);
+function formatWithDots(digits: string): string {
+    if (!digits) return "";
+    return digits.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
 }
 
 function todayIso(): string {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-
-function formatDateVN(iso: string): string {
-    const [y, m, d] = iso.split("-");
-    return `${parseInt(d)}/${parseInt(m)}/${y}`;
 }
 
 /* ─── Page ─── */
@@ -138,7 +130,7 @@ export const AddTransactionPage = () => {
                     <input
                         type="tel"
                         className="atx-amount-input"
-                        value={rawAmount}
+                        value={formatWithDots(rawAmount)}
                         onChange={(e) => setRawAmount(e.target.value.replace(/\D/g, ""))}
                         placeholder="0"
                         inputMode="numeric"
@@ -146,11 +138,6 @@ export const AddTransactionPage = () => {
                         style={{ caretColor: cfg.color }}
                     />
                     <span className="atx-amount-currency">VND</span>
-                    {parsedAmount > 0 && (
-                        <div className="atx-amount-preview" style={{ color: cfg.color }}>
-                            {formatCurrency(parsedAmount, "VND")}
-                        </div>
-                    )}
                 </div>
 
                 {/* ── Date ── */}
@@ -165,9 +152,6 @@ export const AddTransactionPage = () => {
                         max={todayIso()}
                         aria-label="Ngày giao dịch"
                     />
-                    <span style={{ fontSize: "var(--text-sm)", color: "var(--color-text-secondary)", marginLeft: "auto" }}>
-                        {formatDateVN(date)}
-                    </span>
                 </div>
 
                 {/* ── Categories ── */}
@@ -202,7 +186,7 @@ export const AddTransactionPage = () => {
                                     }
                                 >
                                     {cat.icon && (
-                                        <span className="atx-cat-chip__icon">{cat.icon}</span>
+                                        <Icon name={cat.icon} size={16} filled={selectedCatId === cat.id} />
                                     )}
                                     <span className="atx-cat-chip__name">{cat.name}</span>
                                 </button>

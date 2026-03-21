@@ -200,35 +200,6 @@ export const BudgetPage = () => {
                     </div>
                 )}
 
-                {/* Income / Investment / Saving summary */}
-                {!loading && period && summary && (
-                    <div style={{
-                        background: "var(--color-surface)",
-                        borderRadius: "var(--radius-xl)",
-                        padding: "var(--space-4)",
-                        boxShadow: "var(--shadow-xs)",
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: "var(--space-3)",
-                    }}>
-                        <div style={{ fontSize: "var(--text-sm)", fontWeight: "var(--weight-semibold)", color: "var(--color-text-primary)" }}>
-                            Tổng kết dòng tiền
-                        </div>
-                        {[
-                            { label: "Thu nhập",  value: summary.income,     color: "var(--color-income)" },
-                            { label: "Chi tiêu",  value: summary.expense,    color: "var(--color-expense)" },
-                            { label: "Đầu tư",    value: summary.investment, color: "var(--color-investment)" },
-                            { label: "Tiết kiệm", value: summary.saving,     color: "var(--color-saving)" },
-                        ].map((row) => (
-                            <div key={row.label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                                <span style={{ fontSize: "var(--text-sm)", color: "var(--color-text-secondary)" }}>{row.label}</span>
-                                <span style={{ fontSize: "var(--text-sm)", fontWeight: "var(--weight-bold)", color: row.color }}>
-                                    {formatCurrency(row.value, currency)}
-                                </span>
-                            </div>
-                        ))}
-                    </div>
-                )}
             </div>
 
             <BottomNav />

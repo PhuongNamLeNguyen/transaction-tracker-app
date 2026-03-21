@@ -57,7 +57,7 @@ function formatTime(isoStr: string): string {
 }
 
 function formatDateShort(dateStr: string): string {
-    const [, mm, dd] = dateStr.split("-");
+    const [, mm, dd] = dateStr.slice(0, 10).split("-");
     return `${parseInt(dd)}/${parseInt(mm)}`;
 }
 

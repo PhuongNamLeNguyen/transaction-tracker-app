@@ -72,10 +72,49 @@ export interface DashboardResponse {
     transactions: DashboardTransaction[];
 }
 
+export interface ExpenseBreakdownItem {
+    categoryId: string;
+    name: string;
+    icon: string | null;
+    amount: number;
+    currency: string;
+}
+
+export interface ExpenseBreakdown {
+    categories: ExpenseBreakdownItem[];
+    currency: string;
+}
+
+export interface CashflowSummary {
+    income: number;
+    expense: number;
+    investment: number;
+    saving: number;
+    currency: string;
+}
+
 /* ─── Dashboard API ─── */
 export const dashboardApi = {
     async getDashboard(): Promise<DashboardResponse> {
         const res = await fetch(`${BASE}/dashboard`, {
+            headers: authHeaders(),
+            credentials: "include",
+        });
+        if (!res.ok) throw await res.json();
+        return (await res.json()).data;
+    },
+
+    async getExpenseBreakdown(year: number, month: number): Promise<ExpenseBreakdown> {
+        const res = await fetch(`${BASE}/dashboard/expense-breakdown?year=${year}&month=${month}`, {
+            headers: authHeaders(),
+            credentials: "include",
+        });
+        if (!res.ok) throw await res.json();
+        return (await res.json()).data;
+    },
+
+    async getCashflow(year: number, month: number): Promise<CashflowSummary> {
+        const res = await fetch(`${BASE}/dashboard/cashflow?year=${year}&month=${month}`, {
             headers: authHeaders(),
             credentials: "include",
         });
