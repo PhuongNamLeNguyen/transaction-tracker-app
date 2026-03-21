@@ -15,7 +15,7 @@ export const authRouter = Router();
 // Public routes — không cần JWT
 authRouter.post("/register", validate(registerSchema), authController.register);
 authRouter.post("/login", validate(loginSchema), authController.login);
-authRouter.get(
+authRouter.post(
     "/verify-email",
     validate(verifyEmailSchema),
     authController.verifyEmail,

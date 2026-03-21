@@ -39,6 +39,25 @@ export const sessionRepo = {
         );
         return result.rows[0] ?? null;
     },
+    findActiveSessionByToken: async (rawToken: string) => {
+        const bcrypt = await import("bcryptjs");
+        const result = await query(
+            `SELECT * FROM sessions
+         WHERE revoked_at IS NULL
+           AND expired_at > now()
+         ORDER BY created_at DESC`,
+        );
+
+        for (const session of result.rows) {
+            const valid = await bcrypt.compare(
+                rawToken,
+                session.refresh_token_hash,
+            );
+            if (valid) return session;
+        }
+
+        return null;
+    },
 
     revokeSession: async (sessionId: string) => {
         await query(`UPDATE sessions SET revoked_at = now() WHERE id = $1`, [

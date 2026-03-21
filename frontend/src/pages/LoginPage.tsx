@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { authApi, type LoginDto } from "@/api/auth.api";
 import { setToken } from "@/utils/token-utils";
+import { useAuth } from "@/hooks/useAuth";
 
 /* ─── SVG Icons ─── */
 const EyeIcon = () => (
@@ -257,6 +258,7 @@ interface FieldErrors {
 
 /* ─── Login Page ─── */
 export const LoginPage = () => {
+    const { login } = useAuth();
     const navigate = useNavigate();
     const location = useLocation();
     // Redirect về trang user muốn vào trước khi bị chuyển sang /login
@@ -304,6 +306,7 @@ export const LoginPage = () => {
             };
             const res = await authApi.login(dto);
             setToken(res.accessToken);
+            login(res.user);
             navigate(from, { replace: true });
         } catch (err: unknown) {
             const code = (err as { error?: { code?: string } })?.error?.code;

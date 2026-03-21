@@ -2,13 +2,14 @@ import { Request, Response } from "express";
 import { authService } from "../services/auth.service";
 import { asyncHandler } from "../utils/asyncHandler";
 import { sendSuccess } from "../utils/response";
+import { sessionRepo } from "../repositories/session.repo";
 
 const REFRESH_COOKIE_NAME = "refresh_token";
 const COOKIE_OPTIONS = {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
-    sameSite: "strict" as const,
-    path: "/api/v1/auth/refresh",
+    sameSite: "lax" as const,
+    path: "/",
     maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
 };
 
@@ -20,8 +21,15 @@ export const authController = {
     }),
 
     verifyEmail: asyncHandler(async (req: Request, res: Response) => {
-        const { token } = req.query as { token: string }; // bỏ userId
-        await authService.verifyEmail(token);
+        const rawToken = req.body?.rawToken;
+
+        if (!rawToken) {
+            throw Object.assign(new Error("rawToken is required"), {
+                statusCode: 400,
+                code: "BAD_REQUEST",
+            });
+        }
+        await authService.verifyEmail(rawToken);
         sendSuccess(res, { message: "Email verified. You may now log in." });
     }),
 
@@ -41,8 +49,8 @@ export const authController = {
         const cookieOptions = {
             httpOnly: true,
             secure: process.env.NODE_ENV === "production",
-            sameSite: "strict" as const,
-            path: "/api/v1/auth/refresh",
+            sameSite: "lax" as const,
+            path: "/",
             ...(result.rememberMe ? { maxAge: 30 * 24 * 60 * 60 * 1000 } : {}),
         };
 
@@ -63,28 +71,23 @@ export const authController = {
             });
         }
 
-        // Cần userId — decode token để lấy (không verify vì có thể expired)
-        // Dùng session repo tìm theo cookie token
-        // Tạm thời: decode không verify để lấy sub
-        const decoded = JSON.parse(
-            Buffer.from(rawToken.split(".")[1] ?? "", "base64").toString(),
-        ) as { sub?: string };
-
-        if (!decoded.sub) {
+        // rawToken là hex string (crypto.randomBytes) — không phải JWT
+        // Tìm session trong DB bằng bcrypt.compare
+        const session = await sessionRepo.findActiveSessionByToken(rawToken);
+        if (!session) {
             throw Object.assign(new Error("Invalid refresh token"), {
                 statusCode: 401,
                 code: "UNAUTHORIZED",
             });
         }
 
-        const { accessToken, refreshToken } = await authService.refresh(
+        const { accessToken, refreshToken, user } = await authService.refresh(
             rawToken,
-            decoded.sub,
+            session.user_id,
         );
 
-        // Rotate cookie
         res.cookie(REFRESH_COOKIE_NAME, refreshToken, COOKIE_OPTIONS);
-        sendSuccess(res, { accessToken });
+        sendSuccess(res, { accessToken, user });
     }),
 
     logout: asyncHandler(async (req: Request, res: Response) => {

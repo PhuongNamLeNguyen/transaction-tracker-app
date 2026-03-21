@@ -33,10 +33,9 @@ export interface RegisterDto {
    Response shapes — khớp với những gì backend trả về
 ───────────────────────────────────────────────────────────── */
 
-/** Trả về sau login / refresh — có accessToken */
+/** Trả về sau login — refreshToken được set vào HttpOnly cookie bởi backend */
 export interface LoginResponse {
     accessToken: string;
-    refreshToken: string; // raw token đã được set vào HttpOnly cookie, FE không cần dùng trực tiếp
     rememberMe: boolean;
     user: {
         id: string;
@@ -52,10 +51,9 @@ export interface RegisterResponse {
     name: string;
 }
 
-/** Trả về sau refresh — backend KHÔNG trả rememberMe trong refresh */
+/** Trả về sau refresh — refreshToken được rotate vào HttpOnly cookie */
 export interface RefreshResponse {
     accessToken: string;
-    refreshToken: string;
     user: {
         id: string;
         email: string;

@@ -45,6 +45,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         };
     }, []);
 
+    /* ── Login — gọi sau khi login thành công để sync auth state ── */
+    const login = useCallback((authUser: AuthUser) => {
+        setUser(authUser);
+        setStatus("authenticated");
+    }, []);
+
     /* ── Logout ──
      Backend: authService.logout(userId) → revokeAllUserSessions
      FE gửi Bearer token để backend xác định userId
@@ -62,7 +68,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }, []);
 
     return (
-        <AuthContext.Provider value={{ user, status, logout }}>
+        <AuthContext.Provider value={{ user, status, login, logout }}>
             {children}
         </AuthContext.Provider>
     );

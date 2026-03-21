@@ -11,6 +11,7 @@ export type AuthStatus = "loading" | "authenticated" | "unauthenticated";
 export interface AuthContextValue {
     user: AuthUser | null;
     status: AuthStatus;
+    login: (user: AuthUser) => void;
     logout: () => Promise<void>;
 }
 
