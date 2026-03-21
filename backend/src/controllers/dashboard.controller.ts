@@ -87,6 +87,7 @@ export const dashboardController = {
         const transactions = txRows.map((row) => ({
             transactionId: row.id,
             transactionDate: row.transaction_date,
+            createdAt: row.created_at,
             type: row.type,
             amount: Number(row.amount),
             currency: row.currency,

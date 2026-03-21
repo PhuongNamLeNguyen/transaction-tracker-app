@@ -27,6 +27,12 @@ const TYPE_LABELS: Record<string, string> = {
 
 const TYPE_OPTIONS = Object.entries(TYPE_LABELS).map(([v, l]) => ({ value: v, label: l }));
 
+const CURRENT_YEAR = new Date().getFullYear();
+const YEAR_OPTIONS = Array.from({ length: 5 }, (_, i) => CURRENT_YEAR - 4 + i)
+    .map((y) => ({ value: String(y), label: String(y) }));
+
+const MONTH_OPTIONS = MONTH_NAMES.map((m, i) => ({ value: String(i + 1), label: `Tháng ${m}` }));
+
 /* ─────────────────────────────────────────
    Helpers
 ───────────────────────────────────────── */
@@ -273,35 +279,40 @@ function DetailSheet({
 }
 
 /* ─────────────────────────────────────────
-   Dropdown Sheet (for Type / Category filters)
+   Inline Dropdown (positioned below anchor button)
 ───────────────────────────────────────── */
 function DropdownSheet<T extends string>({
-    title,
     options,
     value,
     onSelect,
     onClose,
+    anchorRect,
 }: {
-    title: string;
     options: Array<{ value: T; label: string; icon?: string }>;
     value: T;
     onSelect: (v: T) => void;
     onClose: () => void;
+    anchorRect: DOMRect;
 }) {
+    const left  = Math.min(anchorRect.left, window.innerWidth - Math.max(anchorRect.width, 160) - 8);
+    const style: React.CSSProperties = {
+        top:      anchorRect.bottom + 6,
+        left:     Math.max(8, left),
+        minWidth: Math.max(anchorRect.width, 160),
+    };
+
     return (
         <>
-            <div className="dropdown-sheet-overlay" onClick={onClose} />
-            <div className="dropdown-sheet">
-                <div className="dropdown-sheet__handle" />
-                <div className="dropdown-sheet__title">{title}</div>
+            <div className="dropdown-overlay" onClick={onClose} />
+            <div className="dropdown-menu" style={style}>
                 {options.map((opt) => (
                     <button
                         key={opt.value}
                         className={`dropdown-option${opt.value === value ? " dropdown-option--active" : ""}`}
                         onClick={() => { onSelect(opt.value); onClose(); }}
                     >
-                        {opt.icon && <span style={{ fontSize: 18 }}>{opt.icon}</span>}
-                        {opt.label}
+                        {opt.icon && <Icon name={opt.icon} size={18} />}
+                        <span className="dropdown-option__label">{opt.label}</span>
                         {opt.value === value && (
                             <Icon name="check" size={16} className="dropdown-option__check" />
                         )}
@@ -333,7 +344,14 @@ export const TransactionsPage = () => {
     const [detailTx,  setDetailTx]  = useState<TxDetail | null>(null);
     const [detailLoading, setDetailLoading] = useState(false);
 
-    const [openDropdown, setOpenDropdown] = useState<"type" | "cat" | null>(null);
+    const [openDropdown, setOpenDropdown] = useState<"year" | "month" | "type" | "cat" | null>(null);
+    const [anchorRect,   setAnchorRect]   = useState<DOMRect | null>(null);
+
+    function openAt(key: "year" | "month" | "type" | "cat", e: React.MouseEvent<HTMLButtonElement>) {
+        setAnchorRect(e.currentTarget.getBoundingClientRect());
+        setOpenDropdown(key);
+    }
+    function closeDropdown() { setOpenDropdown(null); setAnchorRect(null); }
 
     /* ── Fetch transactions ── */
     const load = useCallback(async () => {
@@ -363,18 +381,6 @@ export const TransactionsPage = () => {
             setSelectedCatId("all");
         }).catch(() => setCategories([]));
     }, [selectedType]);
-
-    /* ── Month navigation ── */
-    function prevMonth() {
-        if (month === 1) { setYear((y) => y - 1); setMonth(12); }
-        else setMonth((m) => m - 1);
-        setSelectedDate(null);
-    }
-    function nextMonth() {
-        if (month === 12) { setYear((y) => y + 1); setMonth(1); }
-        else setMonth((m) => m + 1);
-        setSelectedDate(null);
-    }
 
     /* ── Open detail ── */
     async function openDetail(id: string) {
@@ -422,33 +428,29 @@ export const TransactionsPage = () => {
                 <div className="txpage__filters">
                     {/* Row 1: Year + Month */}
                     <div className="filter-row">
-                        <div className="filter-pill" style={{ cursor: "default" }}>
+                        <button className={`filter-pill${openDropdown === "year" ? " filter-pill--open" : ""}`} onClick={(e) => openAt("year", e)}>
                             Năm: {year}
-                        </div>
-                        <div className="month-nav">
-                            <button className="month-nav__btn" onClick={prevMonth} aria-label="Tháng trước">
-                                <Icon name="chevron_left" size={16} />
-                            </button>
-                            <span className="month-nav__label">Tháng: {MONTH_NAMES[month - 1]}</span>
-                            <button className="month-nav__btn" onClick={nextMonth} aria-label="Tháng sau">
-                                <Icon name="chevron_right" size={16} />
-                            </button>
-                        </div>
+                            <span className="filter-pill__chevron"><Icon name="expand_more" size={16} /></span>
+                        </button>
+                        <button className={`filter-pill${openDropdown === "month" ? " filter-pill--open" : ""}`} onClick={(e) => openAt("month", e)}>
+                            Tháng: {MONTH_NAMES[month - 1]}
+                            <span className="filter-pill__chevron"><Icon name="expand_more" size={16} /></span>
+                        </button>
                     </div>
 
                     {/* Row 2: Type + Category */}
                     <div className="filter-row">
-                        <button className="filter-pill" onClick={() => setOpenDropdown("type")}>
+                        <button className={`filter-pill${openDropdown === "type" ? " filter-pill--open" : ""}`} onClick={(e) => openAt("type", e)}>
                             Loại: {TYPE_LABELS[selectedType]}
-                            <span className="filter-pill__chevron">▼</span>
+                            <span className="filter-pill__chevron"><Icon name="expand_more" size={16} /></span>
                         </button>
                         <button
-                            className="filter-pill"
-                            onClick={() => selectedType !== "all" && setOpenDropdown("cat")}
+                            className={`filter-pill${openDropdown === "cat" ? " filter-pill--open" : ""}`}
+                            onClick={(e) => { if (selectedType !== "all") openAt("cat", e); }}
                             style={{ opacity: selectedType === "all" ? 0.5 : 1 }}
                         >
                             Mục: {selectedCatLabel}
-                            <span className="filter-pill__chevron">▼</span>
+                            <span className="filter-pill__chevron"><Icon name="expand_more" size={16} /></span>
                         </button>
                     </div>
                 </div>
@@ -550,26 +552,45 @@ export const TransactionsPage = () => {
                 <DetailSheet tx={detailTx} onClose={() => setDetailTx(null)} />
             )}
 
-            {/* Type dropdown */}
-            {openDropdown === "type" && (
-                <DropdownSheet
-                    title="Chọn loại giao dịch"
-                    options={TYPE_OPTIONS}
-                    value={selectedType}
-                    onSelect={(v) => setSelectedType(v)}
-                    onClose={() => setOpenDropdown(null)}
-                />
-            )}
-
-            {/* Category dropdown */}
-            {openDropdown === "cat" && (
-                <DropdownSheet
-                    title="Chọn danh mục"
-                    options={catOptions}
-                    value={selectedCatId}
-                    onSelect={(v) => setSelectedCatId(v)}
-                    onClose={() => setOpenDropdown(null)}
-                />
+            {openDropdown && anchorRect && (
+                <>
+                    {openDropdown === "year" && (
+                        <DropdownSheet
+                            options={YEAR_OPTIONS}
+                            value={String(year)}
+                            onSelect={(v) => { setYear(parseInt(v)); setSelectedDate(null); }}
+                            onClose={closeDropdown}
+                            anchorRect={anchorRect}
+                        />
+                    )}
+                    {openDropdown === "month" && (
+                        <DropdownSheet
+                            options={MONTH_OPTIONS}
+                            value={String(month)}
+                            onSelect={(v) => { setMonth(parseInt(v)); setSelectedDate(null); }}
+                            onClose={closeDropdown}
+                            anchorRect={anchorRect}
+                        />
+                    )}
+                    {openDropdown === "type" && (
+                        <DropdownSheet
+                            options={TYPE_OPTIONS}
+                            value={selectedType}
+                            onSelect={(v) => setSelectedType(v)}
+                            onClose={closeDropdown}
+                            anchorRect={anchorRect}
+                        />
+                    )}
+                    {openDropdown === "cat" && (
+                        <DropdownSheet
+                            options={catOptions}
+                            value={selectedCatId}
+                            onSelect={(v) => setSelectedCatId(v)}
+                            onClose={closeDropdown}
+                            anchorRect={anchorRect}
+                        />
+                    )}
+                </>
             )}
         </div>
     );

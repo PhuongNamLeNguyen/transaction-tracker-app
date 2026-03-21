@@ -144,6 +144,7 @@ export const dashboardRepo = {
             `SELECT
                t.id,
                t.transaction_date,
+               t.created_at,
                t.type,
                t.amount,
                t.currency,

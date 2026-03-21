@@ -18,73 +18,79 @@ const INPUT_METHODS = [
     { key: "manual",  label: "Nhập thủ công",        icon: "edit",         desc: "Điền thông tin bằng tay",  highlighted: false },
 ];
 
-/* ─── Sheet 1: chọn loại giao dịch ─── */
-function Sheet1({ onClose, onSelect }: { onClose: () => void; onSelect: (t: TxType) => void }) {
-    return (
-        <>
-            <div className="sheet-overlay" onClick={onClose} />
-            <div className="sheet">
-                <div className="sheet__handle" />
-                <div className="sheet__title">Loại giao dịch</div>
-                <div className="sheet__options">
-                    {TX_OPTIONS.map((opt) => (
-                        <button
-                            key={opt.type}
-                            className={`sheet-option sheet-option--${opt.type}`}
-                            onClick={() => onSelect(opt.type)}
-                        >
-                            <span className={`sheet-option__icon sheet-option__icon--${opt.type}`}>
-                                <Icon name={opt.icon} size={22} />
-                            </span>
-                            <span className="sheet-option__body">
-                                <span className="sheet-option__name">{opt.label}</span>
-                                <span className="sheet-option__desc">{opt.desc}</span>
-                            </span>
-                            <Icon name="chevron_right" size={18} className="sheet-option__chevron" />
-                        </button>
-                    ))}
-                </div>
-            </div>
-        </>
-    );
-}
-
-/* ─── Sheet 2: chọn phương thức nhập ─── */
-function Sheet2({ txType, onClose }: { txType: TxType; onClose: () => void }) {
+/* ─── Combined Sheet: chọn loại → chọn phương thức ─── */
+function TxSheet({ onClose }: { onClose: () => void }) {
     const navigate = useNavigate();
-    const opt = TX_OPTIONS.find((o) => o.type === txType)!;
+    const [selectedType, setSelectedType] = useState<TxType | null>(null);
 
-    function handleSelect(key: string) {
+    function handleMethodSelect(key: string) {
         onClose();
-        if (key === "manual") {
-            navigate(`/add-transaction?type=${txType}`);
+        if (key === "manual" && selectedType) {
+            navigate(`/add-transaction?type=${selectedType}`);
         }
         // camera / gallery: TODO
     }
 
+    const txOpt = selectedType ? TX_OPTIONS.find((o) => o.type === selectedType)! : null;
+
     return (
         <>
             <div className="sheet-overlay" onClick={onClose} />
             <div className="sheet">
                 <div className="sheet__handle" />
-                <div className="sheet__title">Phương thức — {opt.label}</div>
-                <div className="sheet__options">
-                    {INPUT_METHODS.map((m) => (
+
+                {/* Header with optional back button */}
+                <div className="sheet__title-row">
+                    {selectedType && (
                         <button
-                            key={m.key}
-                            className={`sheet-option${m.highlighted ? " sheet-option--income sheet-option--highlighted" : ""}`}
-                            onClick={() => handleSelect(m.key)}
+                            className="sheet__back"
+                            onClick={() => setSelectedType(null)}
+                            aria-label="Quay lại"
+                            type="button"
                         >
-                            <span className={`sheet-option__icon sheet-option__icon--${m.highlighted ? "income" : m.key === "gallery" ? "investment" : "saving"}`}>
-                                <Icon name={m.icon} size={22} />
-                            </span>
-                            <span className="sheet-option__body">
-                                <span className="sheet-option__name">{m.label}</span>
-                                <span className="sheet-option__desc">{m.desc}</span>
-                            </span>
-                            <Icon name="chevron_right" size={18} className="sheet-option__chevron" />
+                            <Icon name="arrow_back" size={20} />
                         </button>
-                    ))}
+                    )}
+                    <span className="sheet__title">
+                        {selectedType ? `Phương thức — ${txOpt!.label}` : "Loại giao dịch"}
+                    </span>
+                </div>
+
+                <div className="sheet__options">
+                    {!selectedType
+                        ? TX_OPTIONS.map((opt) => (
+                            <button
+                                key={opt.type}
+                                className={`sheet-option sheet-option--${opt.type}`}
+                                onClick={() => setSelectedType(opt.type)}
+                            >
+                                <span className={`sheet-option__icon sheet-option__icon--${opt.type}`}>
+                                    <Icon name={opt.icon} size={22} />
+                                </span>
+                                <span className="sheet-option__body">
+                                    <span className="sheet-option__name">{opt.label}</span>
+                                    <span className="sheet-option__desc">{opt.desc}</span>
+                                </span>
+                                <Icon name="chevron_right" size={18} className="sheet-option__chevron" />
+                            </button>
+                        ))
+                        : INPUT_METHODS.map((m) => (
+                            <button
+                                key={m.key}
+                                className={`sheet-option${m.highlighted ? " sheet-option--income sheet-option--highlighted" : ""}`}
+                                onClick={() => handleMethodSelect(m.key)}
+                            >
+                                <span className={`sheet-option__icon sheet-option__icon--${m.highlighted ? "income" : m.key === "gallery" ? "investment" : "saving"}`}>
+                                    <Icon name={m.icon} size={22} />
+                                </span>
+                                <span className="sheet-option__body">
+                                    <span className="sheet-option__name">{m.label}</span>
+                                    <span className="sheet-option__desc">{m.desc}</span>
+                                </span>
+                                <Icon name="chevron_right" size={18} className="sheet-option__chevron" />
+                            </button>
+                        ))
+                    }
                 </div>
             </div>
         </>
@@ -95,15 +101,14 @@ function Sheet2({ txType, onClose }: { txType: TxType; onClose: () => void }) {
 export const BottomNav = () => {
     const navigate      = useNavigate();
     const { pathname }  = useLocation();
-    const [fabOpen, setFabOpen]             = useState(false);
-    const [selectedTxType, setSelectedTxType] = useState<TxType | null>(null);
+    const [fabOpen, setFabOpen] = useState(false);
 
     function isActive(path: string) {
         if (path === "/") return pathname === "/";
         return pathname.startsWith(path);
     }
 
-    function closeFab() { setFabOpen(false); setSelectedTxType(null); }
+    function closeFab() { setFabOpen(false); }
 
     return (
         <>
@@ -156,12 +161,7 @@ export const BottomNav = () => {
                 </button>
             </nav>
 
-            {fabOpen && !selectedTxType && (
-                <Sheet1 onClose={closeFab} onSelect={(t) => setSelectedTxType(t)} />
-            )}
-            {fabOpen && selectedTxType && (
-                <Sheet2 txType={selectedTxType} onClose={closeFab} />
-            )}
+            {fabOpen && <TxSheet onClose={closeFab} />}
         </>
     );
 };

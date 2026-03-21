@@ -53,6 +53,7 @@ export interface BudgetProgressItem {
 export interface DashboardTransaction {
     transactionId: string;
     transactionDate: string;
+    createdAt: string;
     type: "income" | "expense" | "investment" | "saving";
     amount: number;
     currency: string;

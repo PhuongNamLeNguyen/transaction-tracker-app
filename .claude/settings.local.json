@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(npm run:*)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(find '/d/WORK/Project AI/New/transaction_tracker_app/backend/src' -type f -name *.ts)"
     ]
   }
 }

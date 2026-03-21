@@ -22,34 +22,34 @@ BEGIN;
 -- expense
 -- -----------------------------------------------------------------------------
 INSERT INTO categories (id, name, type, icon) VALUES
-  ('cat_expense_food',       'Ăn uống',      'expense', 'fork_knife'),
-  ('cat_expense_transport',  'Di chuyển',    'expense', 'car'),
-  ('cat_expense_living',     'Phí sinh hoạt','expense', 'house'),
-  ('cat_expense_education',  'Giáo dục',     'expense', 'book'),
-  ('cat_expense_fashion',    'Thời trang',   'expense', 'shirt'),
-  ('cat_expense_health',     'Sức khỏe',     'expense', 'heart'),
-  ('cat_expense_gift',       'Quà tặng',     'expense', 'gift'),
-  ('cat_expense_entertain',  'Giải trí',     'expense', 'smile'),
-  ('cat_expense_pet',        'Thú cưng',     'expense', 'paw'),
-  ('cat_expense_other',      'Khác',         'expense', 'dots')
+  ('cat_expense_food',       'Ăn uống',      'expense', 'restaurant'),
+  ('cat_expense_transport',  'Di chuyển',    'expense', 'directions_car'),
+  ('cat_expense_living',     'Phí sinh hoạt','expense', 'home'),
+  ('cat_expense_education',  'Giáo dục',     'expense', 'school'),
+  ('cat_expense_fashion',    'Thời trang',   'expense', 'checkroom'),
+  ('cat_expense_health',     'Sức khỏe',     'expense', 'health_and_safety'),
+  ('cat_expense_gift',       'Quà tặng',     'expense', 'card_giftcard'),
+  ('cat_expense_entertain',  'Giải trí',     'expense', 'celebration'),
+  ('cat_expense_pet',        'Thú cưng',     'expense', 'pets'),
+  ('cat_expense_other',      'Khác',         'expense', 'category')
 ON CONFLICT (id) DO NOTHING;
 
 -- -----------------------------------------------------------------------------
 -- income
 -- -----------------------------------------------------------------------------
 INSERT INTO categories (id, name, type, icon) VALUES
-  ('cat_income_salary',  'Lương',    'income', 'briefcase'),
+  ('cat_income_salary',  'Lương',    'income', 'work'),
   ('cat_income_bonus',   'Thưởng',   'income', 'star'),
-  ('cat_income_gift',    'Quà tặng', 'income', 'gift')
+  ('cat_income_gift',    'Quà tặng', 'income', 'card_giftcard')
 ON CONFLICT (id) DO NOTHING;
 
 -- -----------------------------------------------------------------------------
 -- investment
 -- -----------------------------------------------------------------------------
 INSERT INTO categories (id, name, type, icon) VALUES
-  ('cat_invest_gold',    'Mua vàng',               'investment', 'gold_bar'),
-  ('cat_invest_realty',  'Mua bất động sản',        'investment', 'building'),
-  ('cat_invest_stock',   'Mua chứng khoán / cổ phiếu', 'investment', 'chart_up'),
+  ('cat_invest_gold',    'Mua vàng',               'investment', 'diamond'),
+  ('cat_invest_realty',  'Mua bất động sản',        'investment', 'apartment'),
+  ('cat_invest_stock',   'Mua chứng khoán / cổ phiếu', 'investment', 'show_chart'),
   ('cat_invest_biz',     'Kinh doanh',              'investment', 'store')
 ON CONFLICT (id) DO NOTHING;
 
@@ -57,7 +57,7 @@ ON CONFLICT (id) DO NOTHING;
 -- saving
 -- -----------------------------------------------------------------------------
 INSERT INTO categories (id, name, type, icon) VALUES
-  ('cat_saving_deposit',    'Gửi tiết kiệm cá nhân', 'saving', 'piggy_bank'),
+  ('cat_saving_deposit',    'Gửi tiết kiệm cá nhân', 'saving', 'savings'),
   ('cat_saving_insurance',  'Đóng bảo hiểm dài hạn', 'saving', 'shield')
 ON CONFLICT (id) DO NOTHING;
 

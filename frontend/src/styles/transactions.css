@@ -41,12 +41,12 @@
     flex: 1;
     display: flex;
     align-items: center;
-    justify-content: center;
+    justify-content: space-between;
     gap: var(--space-1);
     background: var(--color-surface-raised);
     border: none;
     border-radius: var(--radius-full);
-    padding: var(--space-2) var(--space-3);
+    padding: var(--space-2) var(--space-4);
     font-size: var(--text-sm);
     font-weight: var(--weight-medium);
     color: var(--color-text-primary);
@@ -54,6 +54,7 @@
     white-space: nowrap;
     min-height: 36px;
     transition: background var(--duration-fast) var(--ease-standard);
+    font-family: var(--font-sans);
 }
 
 .filter-pill:active {
@@ -62,45 +63,16 @@
 
 .filter-pill__chevron {
     color: var(--color-text-secondary);
-    font-size: 10px;
-}
-
-/* Month navigation pill */
-.month-nav {
-    flex: 1;
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    background: var(--color-surface-raised);
-    border-radius: var(--radius-full);
-    padding: var(--space-1) var(--space-2);
-    min-height: 36px;
-    gap: var(--space-2);
+    flex-shrink: 0;
+    transition: transform var(--duration-fast) var(--ease-standard);
 }
 
-.month-nav__btn {
-    background: none;
-    border: none;
-    cursor: pointer;
-    padding: var(--space-1);
-    color: var(--color-text-secondary);
-    line-height: 1;
-    border-radius: var(--radius-full);
-    display: flex;
-    align-items: center;
+.filter-pill--open .filter-pill__chevron {
+    transform: rotate(180deg);
 }
 
-.month-nav__btn:active {
-    background: var(--color-border);
-}
-
-.month-nav__label {
-    font-size: var(--text-sm);
-    font-weight: var(--weight-medium);
-    color: var(--color-text-primary);
-    flex: 1;
-    text-align: center;
-}
 
 /* ── Calendar Toggle ── */
 .txpage__cal-toggle {
@@ -133,19 +105,19 @@
 .calendar__header {
     display: grid;
     grid-template-columns: repeat(7, 1fr);
-    background: var(--palette-orange-100, #fef0e0);
+    background: var(--palette-orange-800);
 }
 
 .calendar__dow {
     text-align: center;
     font-size: var(--text-2xs);
     font-weight: var(--weight-semibold);
-    color: var(--color-text-secondary);
+    color: rgba(255, 255, 255, 0.85);
     padding: var(--space-2) 0;
 }
 
 .calendar__dow--weekend {
-    color: var(--color-accent);
+    color: var(--palette-orange-300);
 }
 
 .calendar__grid {
@@ -158,10 +130,10 @@
     min-height: 52px;
     border-right: 1px solid var(--color-divider);
     border-bottom: 1px solid var(--color-divider);
-    padding: 4px 3px 3px;
+    padding: 6px;
     display: flex;
     flex-direction: column;
-    align-items: center;
+    align-items: flex-start;
     gap: 2px;
     cursor: default;
     position: relative;
@@ -172,18 +144,20 @@
 }
 
 .calendar__cell--outside {
-    background: rgba(0, 0, 0, 0.02);
+    background: var(--color-surface-raised);
+}
+
+.calendar__cell--today {
+    background: var(--palette-orange-800);
 }
 
 .calendar__cell--today .calendar__day-num {
-    background: var(--color-accent);
-    color: var(--color-text-inverse);
-    border-radius: var(--radius-full);
-    width: 22px;
-    height: 22px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    color: var(--palette-neutral-0);
+}
+
+.calendar__cell--today .calendar__income,
+.calendar__cell--today .calendar__expense {
+    color: rgba(255, 255, 255, 0.85);
 }
 
 .calendar__cell--selected .calendar__day-num {
@@ -499,58 +473,46 @@
     background: var(--color-surface-raised);
 }
 
-/* ── Dropdown Sheet ── */
-.dropdown-sheet-overlay {
+/* ── Positioned Dropdown ── */
+.dropdown-overlay {
     position: fixed;
     inset: 0;
-    background: rgba(61, 26, 6, 0.3);
     z-index: var(--z-overlay);
-    animation: fadeIn var(--duration-base) var(--ease-standard);
 }
 
-.dropdown-sheet {
+.dropdown-menu {
     position: fixed;
-    left: 0;
-    right: 0;
-    bottom: 0;
     background: var(--color-surface);
-    border-radius: var(--radius-2xl) var(--radius-2xl) 0 0;
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--color-border);
+    box-shadow: 0 8px 24px rgba(61, 26, 6, 0.14), 0 2px 6px rgba(61, 26, 6, 0.08);
     z-index: var(--z-modal);
-    padding-bottom: calc(var(--space-4) + var(--space-safe-bottom));
-    animation: slideUp var(--duration-slow) var(--ease-decelerate);
-    max-height: 60dvh;
+    max-height: 260px;
     overflow-y: auto;
+    animation: dropdownIn var(--duration-fast) var(--ease-decelerate);
+    padding: var(--space-1) 0;
 }
 
-.dropdown-sheet__handle {
-    width: 36px;
-    height: 4px;
-    background: var(--color-border);
-    border-radius: var(--radius-full);
-    margin: var(--space-3) auto var(--space-1);
-}
-
-.dropdown-sheet__title {
-    font-size: var(--text-sm);
-    font-weight: var(--weight-semibold);
-    color: var(--color-text-secondary);
-    padding: var(--space-2) var(--space-5) var(--space-3);
-    border-bottom: 1px solid var(--color-divider);
+@keyframes dropdownIn {
+    from { opacity: 0; transform: translateY(-6px) scale(0.97); }
+    to   { opacity: 1; transform: translateY(0)    scale(1); }
 }
 
 .dropdown-option {
     display: flex;
     align-items: center;
-    gap: var(--space-3);
-    padding: var(--space-3) var(--space-5);
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-3);
     border: none;
     background: none;
     width: 100%;
     text-align: left;
     cursor: pointer;
     font-size: var(--text-sm);
+    font-family: var(--font-sans);
     color: var(--color-text-primary);
     transition: background var(--duration-instant) var(--ease-standard);
+    white-space: nowrap;
 }
 
 .dropdown-option:active {
@@ -560,10 +522,15 @@
 .dropdown-option--active {
     color: var(--color-accent);
     font-weight: var(--weight-semibold);
+    background: var(--color-accent-bg);
+}
+
+.dropdown-option__label {
+    flex: 1;
 }
 
 .dropdown-option__check {
-    margin-left: auto;
+    flex-shrink: 0;
     color: var(--color-accent);
 }
 

@@ -5,7 +5,6 @@ import {
     type DashboardResponse,
     type DashboardTransaction,
     type CashflowSummary,
-    type ExpenseBreakdown,
 } from "@/api/dashboard.api";
 import { transactionsApi, type TxDetail } from "@/api/transactions.api";
 import { BottomNav } from "@/components/common/BottomNav";
@@ -210,9 +209,8 @@ export const DashboardPage = () => {
     const { user } = useAuth();
     const nowDate = new Date();
 
-    const [data, setData]               = useState<DashboardResponse | null>(null);
-    const [loading, setLoading]         = useState(true);
-    const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+    const [data, setData]   = useState<DashboardResponse | null>(null);
+    const [loading, setLoading] = useState(true);
 
     const [balanceHidden, setBalanceHidden] = useState(false);
     const [detailOpen, setDetailOpen]       = useState(false);
@@ -223,9 +221,6 @@ export const DashboardPage = () => {
     const [cashflow, setCashflow]               = useState<CashflowSummary | null>(null);
     const [cashflowLoading, setCashflowLoading] = useState(true);
 
-    const [expenseBreakdown, setExpenseBreakdown]   = useState<ExpenseBreakdown | null>(null);
-    const [expenseLoading, setExpenseLoading]       = useState(true);
-
     const [detailTx, setDetailTx]           = useState<TxDetail | null>(null);
     const [detailLoading, setDetailLoading] = useState(false);
 
@@ -234,7 +229,6 @@ export const DashboardPage = () => {
         try {
             const res = await dashboardApi.getDashboard();
             setData(res);
-            setLastUpdated(new Date());
         } catch {
             /* ignore */
         } finally {
@@ -249,18 +243,10 @@ export const DashboardPage = () => {
         finally { setCashflowLoading(false); }
     }, []);
 
-    const loadExpenseBreakdown = useCallback(async (year: number, month: number) => {
-        setExpenseLoading(true);
-        try { setExpenseBreakdown(await dashboardApi.getExpenseBreakdown(year, month)); }
-        catch { setExpenseBreakdown(null); }
-        finally { setExpenseLoading(false); }
-    }, []);
-
     useEffect(() => { loadDashboard(); }, [loadDashboard]);
     useEffect(() => {
         loadCashflow(selectedYear, selectedMonth);
-        loadExpenseBreakdown(selectedYear, selectedMonth);
-    }, [selectedYear, selectedMonth, loadCashflow, loadExpenseBreakdown]);
+    }, [selectedYear, selectedMonth, loadCashflow]);
 
     /* ── Open transaction detail ── */
     async function openTxDetail(id: string) {
@@ -309,14 +295,28 @@ export const DashboardPage = () => {
     ];
     const sliceTotal = cfExpense + cfInvestment + cfSaving + cfAvailable;
 
-    const expCats     = expenseBreakdown?.categories ?? [];
-    const expTotal    = expCats.reduce((s, c) => s + c.amount, 0);
-    const expCurrency = expenseBreakdown?.currency ?? currency;
-
-    /* ── Updated label ── */
-    const updatedLabel = lastUpdated
-        ? `Cập nhật ${lastUpdated.getHours().toString().padStart(2, "0")}:${lastUpdated.getMinutes().toString().padStart(2, "0")}`
-        : "Đang tải...";
+    /* ── Updated label — based on most recent transaction date ── */
+    function getRelativeTimeLabel(isoStr: string): string {
+        const diffMs = Date.now() - new Date(isoStr).getTime();
+        const minutes = Math.floor(diffMs / 60_000);
+        if (minutes < 60) return `Cập nhật ${Math.max(minutes, 1)} phút trước`;
+        const hours = Math.floor(diffMs / 3_600_000);
+        if (hours < 24) return `Cập nhật ${hours} tiếng trước`;
+        const days = Math.floor(diffMs / 86_400_000);
+        if (days < 7) return `Cập nhật ${days} ngày trước`;
+        const weeks = Math.floor(days / 7);
+        if (weeks < 4) return `Cập nhật ${weeks} tuần trước`;
+        const months = Math.floor(days / 30);
+        if (months < 12) return `Cập nhật ${months} tháng trước`;
+        const years = Math.floor(days / 365);
+        return `Cập nhật ${years} năm trước`;
+    }
+    const latestTxCreatedAt = data?.transactions[0]?.createdAt ?? null;
+    const updatedLabel = loading
+        ? "Đang tải..."
+        : latestTxCreatedAt
+            ? getRelativeTimeLabel(latestTxCreatedAt)
+            : "Chưa có giao dịch";
 
     return (
         <div className="dashboard">
@@ -430,12 +430,12 @@ export const DashboardPage = () => {
                                             <div className="legend-item__left">
                                                 <span className="legend-item__dot"
                                                     style={{ background: isZero ? "var(--color-text-tertiary)" : sl.color }} />
-                                                <span className={`legend-item__label${isZero ? " legend-item__label--zero" : ""}`}>
+                                                <span className={`legend-item__label${isZero ? " legend-item__label--zero" : " legend-item__label--active"}`}>
                                                     {sl.label}
                                                 </span>
                                             </div>
                                             <span className="legend-item__pct"
-                                                style={{ color: isZero ? "var(--color-text-tertiary)" : sl.color }}>
+                                                style={{ color: isZero ? "var(--color-text-tertiary)" : sl.color, fontWeight: isZero ? undefined : "var(--weight-bold)" as React.CSSProperties["fontWeight"] }}>
                                                 {pct}%
                                             </span>
                                         </div>
@@ -449,66 +449,6 @@ export const DashboardPage = () => {
                                 {cashflowLoading ? "—" : formatCurrency(cfIncome, currency)}
                             </span>
                         </div>
-                    </div>
-                </section>
-
-                {/* ── Expense breakdown section ── */}
-                <section>
-                    <div className="cashflow-section__header">
-                        <span className="cashflow-section__title">Thống kê chi tiêu trong tháng</span>
-                        <span className="month-label-static">
-                            <Icon name="calendar_month" size={13} />
-                            {monthLabel(selectedMonth, selectedYear)}
-                        </span>
-                    </div>
-
-                    <div className="piechart-card exp-breakdown-card">
-                        {expenseLoading ? (
-                            <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
-                                {[1, 2, 3].map((i) => (
-                                    <div key={i} className="skeleton" style={{ height: 44, borderRadius: "var(--radius-md)" }} />
-                                ))}
-                            </div>
-                        ) : expCats.length === 0 ? (
-                            <div className="exp-breakdown-empty">
-                                <Icon name="shopping_bag" size={32} />
-                                <span>Không có chi tiêu trong tháng này</span>
-                            </div>
-                        ) : (
-                            <>
-                                {expCats.map((cat) => {
-                                    const pct = expTotal > 0 ? Math.round((cat.amount / expTotal) * 100) : 0;
-                                    return (
-                                        <div key={cat.categoryId} className="exp-cat-item">
-                                            <div className="exp-cat-item__top">
-                                                <div className="exp-cat-item__left">
-                                                    {cat.icon
-                                                        ? <Icon name={cat.icon} size={16} />
-                                                        : <Icon name="category" size={16} />
-                                                    }
-                                                    <span className="exp-cat-item__name">{cat.name}</span>
-                                                </div>
-                                                <div className="exp-cat-item__right">
-                                                    <span className="exp-cat-item__amount">
-                                                        {formatCurrency(cat.amount, cat.currency)}
-                                                    </span>
-                                                    <span className="exp-cat-item__pct">{pct}%</span>
-                                                </div>
-                                            </div>
-                                            <div className="exp-cat-bar">
-                                                <div className="exp-cat-bar__fill" style={{ width: `${pct}%` }} />
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-                                <div className="exp-breakdown-total">
-                                    <span>Tổng chi tiêu</span>
-                                    <span className="exp-breakdown-total__val">
-                                        {formatCurrency(expTotal, expCurrency)}
-                                    </span>
-                                </div>
-                            </>
-                        )}
                     </div>
                 </section>
 

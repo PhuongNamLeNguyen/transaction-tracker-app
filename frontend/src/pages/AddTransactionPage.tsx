@@ -66,6 +66,7 @@ export const AddTransactionPage = () => {
     const parsedAmount = parseInt(rawAmount || "0", 10);
     const isValid = parsedAmount > 0 && selectedCatId !== null;
     const cfg = TYPE_CONFIG[type];
+    const currency = "VND";
 
     async function handleSubmit(e: React.FormEvent) {
         e.preventDefault();
@@ -126,86 +127,84 @@ export const AddTransactionPage = () => {
                 </div>
 
                 {/* ── Amount ── */}
-                <div className="atx-amount-section">
-                    <input
-                        type="tel"
-                        className="atx-amount-input"
-                        value={formatWithDots(rawAmount)}
-                        onChange={(e) => setRawAmount(e.target.value.replace(/\D/g, ""))}
-                        placeholder="0"
-                        inputMode="numeric"
-                        autoFocus
-                        style={{ caretColor: cfg.color }}
-                    />
-                    <span className="atx-amount-currency">VND</span>
+                <div className="atx-field-group">
+                    <label className="atx-label" htmlFor="atx-amount">
+                        Số tiền ({currency}) <span className="atx-req">*</span>
+                    </label>
+                    <div className="atx-field-row">
+                        <input
+                            id="atx-amount"
+                            type="tel"
+                            className="atx-amount-input"
+                            value={formatWithDots(rawAmount)}
+                            onChange={(e) => setRawAmount(e.target.value.replace(/\D/g, ""))}
+                            placeholder="50.000"
+                            inputMode="numeric"
+                            autoFocus
+                            style={{ caretColor: cfg.color }}
+                        />
+                    </div>
                 </div>
 
                 {/* ── Date ── */}
-                <div className="atx-field-row">
-                    <Icon name="calendar_month" size={20} style={{ color: "var(--color-text-secondary)" }} />
-                    <span className="atx-field-label">Ngày</span>
-                    <input
-                        type="date"
-                        className="atx-date-input"
-                        value={date}
-                        onChange={(e) => setDate(e.target.value)}
-                        max={todayIso()}
-                        aria-label="Ngày giao dịch"
-                    />
+                <div className="atx-field-group">
+                    <label className="atx-label" htmlFor="atx-date">Ngày giao dịch</label>
+                    <div className="atx-field-row">
+                        <Icon name="calendar_month" size={20} style={{ color: "var(--color-text-secondary)" }} />
+                        <input
+                            id="atx-date"
+                            type="date"
+                            className="atx-date-input"
+                            value={date}
+                            onChange={(e) => setDate(e.target.value)}
+                            max={todayIso()}
+                        />
+                    </div>
                 </div>
 
-                {/* ── Categories ── */}
-                <div className="atx-cat-section">
-                    <div className="atx-section-label">
-                        Danh mục <span style={{ color: "var(--color-error)" }}>*</span>
+                {/* ── Category ── */}
+                <div className="atx-field-group">
+                    <label className="atx-label" htmlFor="atx-cat">
+                        Danh mục <span className="atx-req">*</span>
+                    </label>
+                    <div className="atx-field-row">
+                        <Icon name="category" size={20} style={{ color: "var(--color-text-secondary)" }} />
+                        {catLoading ? (
+                            <span className="atx-select-loading">
+                                <Icon name="progress_activity" size={16} className="spin-icon" />
+                                Đang tải...
+                            </span>
+                        ) : (
+                            <select
+                                id="atx-cat"
+                                className="atx-select"
+                                value={selectedCatId ?? ""}
+                                onChange={(e) => setSelectedCatId(e.target.value || null)}
+                            >
+                                <option value="">Chọn danh mục</option>
+                                {categories.map((cat) => (
+                                    <option key={cat.id} value={cat.id}>{cat.name}</option>
+                                ))}
+                            </select>
+                        )}
                     </div>
-                    {catLoading ? (
-                        <div className="atx-cat-loading">
-                            <Icon name="progress_activity" size={22} className="spin-icon" />
-                        </div>
-                    ) : (
-                        <div className="atx-cat-grid">
-                            {categories.map((cat) => (
-                                <button
-                                    key={cat.id}
-                                    type="button"
-                                    className={`atx-cat-chip${selectedCatId === cat.id ? " atx-cat-chip--active" : ""}`}
-                                    style={
-                                        selectedCatId === cat.id
-                                            ? {
-                                                  background: cfg.color + "22",
-                                                  borderColor: cfg.color,
-                                                  color: cfg.color,
-                                              }
-                                            : undefined
-                                    }
-                                    onClick={() =>
-                                        setSelectedCatId((prev) =>
-                                            prev === cat.id ? null : cat.id
-                                        )
-                                    }
-                                >
-                                    {cat.icon && (
-                                        <Icon name={cat.icon} size={16} filled={selectedCatId === cat.id} />
-                                    )}
-                                    <span className="atx-cat-chip__name">{cat.name}</span>
-                                </button>
-                            ))}
-                        </div>
-                    )}
                 </div>
 
                 {/* ── Note ── */}
-                <div className="atx-field-row atx-field-row--top">
-                    <Icon name="notes" size={20} style={{ color: "var(--color-text-secondary)", marginTop: 2 }} />
-                    <textarea
-                        className="atx-note-input"
-                        value={note}
-                        onChange={(e) => setNote(e.target.value)}
-                        placeholder="Ghi chú (tùy chọn)"
-                        rows={2}
-                        maxLength={500}
-                    />
+                <div className="atx-field-group">
+                    <label className="atx-label" htmlFor="atx-note">Ghi chú</label>
+                    <div className="atx-field-row">
+                        <Icon name="notes" size={20} style={{ color: "var(--color-text-secondary)" }} />
+                        <input
+                            id="atx-note"
+                            type="text"
+                            className="atx-note-input"
+                            value={note}
+                            onChange={(e) => setNote(e.target.value)}
+                            placeholder="Ăn trưa"
+                            maxLength={500}
+                        />
+                    </div>
                 </div>
 
                 {/* ── Error / Success ── */}
