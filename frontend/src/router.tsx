@@ -6,6 +6,8 @@ import { RegisterPage } from "@/pages/RegisterPage";
 import { DashboardPage } from "@/pages/DashboardPage";
 import { OnboardingPage } from "@/pages/OnboardingPage";
 import { TransactionsPage } from "@/pages/TransactionsPage";
+import { BudgetPage } from "@/pages/BudgetPage";
+import { SettingsPage } from "@/pages/SettingsPage";
 
 /*
   Route structure:
@@ -30,6 +32,8 @@ export const router = createBrowserRouter([
             { path: "/onboarding",    element: <OnboardingPage /> },
             { path: "/",              element: <DashboardPage /> },
             { path: "/transactions",  element: <TransactionsPage /> },
+            { path: "/budgets",       element: <BudgetPage /> },
+            { path: "/settings",      element: <SettingsPage /> },
             // Các route sau sẽ thêm dần theo từng feature:
             // { path: '/transactions/:id', element: <TransactionDetailPage /> },
             // { path: '/accounts',         element: <AccountsPage /> },
