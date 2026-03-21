@@ -1,6 +1,29 @@
 /* frontend/src/styles/global.css */
 @import "./tokens.css";
 
+/* ─── Material Symbols ─── */
+.material-symbols-rounded {
+    font-family: "Material Symbols Rounded";
+    font-weight: normal;
+    font-style: normal;
+    line-height: 1;
+    letter-spacing: normal;
+    text-transform: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    white-space: nowrap;
+    word-wrap: normal;
+    direction: ltr;
+    -webkit-font-smoothing: antialiased;
+    user-select: none;
+}
+
+/* ─── Spinner animation ─── */
+@keyframes spin { to { transform: rotate(360deg); } }
+.spin-icon { animation: spin 0.7s linear infinite; }
+@media (prefers-reduced-motion: reduce) { .spin-icon { animation: none; } }
+
 /* ─── Reset ─── */
 *,
 *::before,

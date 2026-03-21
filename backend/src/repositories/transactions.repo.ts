@@ -116,4 +116,44 @@ export const transactionsRepo = {
         );
         return result.rows;
     },
+
+    /* ─── Get user's primary account ─── */
+    getUserAccount: async (userId: string) => {
+        const result = await query(
+            `SELECT id, currency, balance FROM accounts WHERE user_id = $1 LIMIT 1`,
+            [userId],
+        );
+        return result.rows[0] ?? null;
+    },
+
+    /* ─── Create a manual transaction with a single split ─── */
+    create: async (params: {
+        userId: string;
+        accountId: string;
+        type: string;
+        amount: number;
+        currency: string;
+        transactionDate: string;
+        categoryId: string;
+        note?: string;
+    }) => {
+        const { userId, accountId, type, amount, currency, transactionDate, categoryId, note } = params;
+
+        const txResult = await query(
+            `INSERT INTO transactions
+               (user_id, account_id, type, amount, currency, status, source, transaction_date, note)
+             VALUES ($1, $2, $3, $4, $5, 'confirmed', 'manual', $6, $7)
+             RETURNING id, type, amount, currency, transaction_date, note, created_at`,
+            [userId, accountId, type, amount, currency, transactionDate, note ?? null],
+        );
+        const tx = txResult.rows[0];
+
+        await query(
+            `INSERT INTO transaction_splits (transaction_id, category_id, amount)
+             VALUES ($1, $2, $3)`,
+            [tx.id, categoryId, amount],
+        );
+
+        return tx;
+    },
 };

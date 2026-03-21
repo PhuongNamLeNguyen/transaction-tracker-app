@@ -26,7 +26,7 @@ export const budgetController = {
         const summary = { income: 0, expense: 0, investment: 0, saving: 0, currency: "VND" };
         for (const row of summaryRows) {
             const key = row.type as keyof typeof summary;
-            if (key in summary) (summary as Record<string, number>)[key] = Number(row.total);
+            if (key in summary) (summary as unknown as Record<string, number>)[key] = Number(row.total);
         }
 
         const budgetProgress = budgetRows.map((row) => ({

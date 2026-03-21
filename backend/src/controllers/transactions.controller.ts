@@ -1,8 +1,17 @@
 import { Request, Response } from "express";
+import { z } from "zod";
 import { asyncHandler } from "../utils/asyncHandler";
 import { sendSuccess } from "../utils/response";
 import { AppError } from "../utils/AppError";
 import { transactionsRepo } from "../repositories/transactions.repo";
+
+const createTransactionSchema = z.object({
+    type: z.enum(["income", "expense", "investment", "saving"]),
+    amount: z.number().positive(),
+    transactionDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    categoryId: z.string().uuid(),
+    note: z.string().max(500).optional(),
+});
 
 export const transactionsController = {
     /** GET /transactions?year=&month=&type=&category_id= */
@@ -54,12 +63,49 @@ export const transactionsController = {
         sendSuccess(res, categories);
     }),
 
+    /** POST /transactions */
+    create: asyncHandler(async (req: Request, res: Response) => {
+        const parsed = createTransactionSchema.safeParse(req.body);
+        if (!parsed.success) {
+            throw new AppError(parsed.error.issues[0]?.message ?? "Invalid input", 400, "VALIDATION_ERROR");
+        }
+        const { type, amount, transactionDate, categoryId, note } = parsed.data;
+        const userId = req.user!.id;
+
+        const account = await transactionsRepo.getUserAccount(userId);
+        if (!account) throw new AppError("No account found", 400, "VALIDATION_ERROR");
+
+        const tx = await transactionsRepo.create({
+            userId,
+            accountId: account.id,
+            type,
+            amount,
+            currency: account.currency,
+            transactionDate,
+            categoryId,
+            note,
+        });
+
+        res.status(201).json({
+            success: true,
+            data: {
+                id: tx.id,
+                type: tx.type,
+                amount: Number(tx.amount),
+                currency: tx.currency,
+                transactionDate: tx.transaction_date,
+                note: tx.note ?? null,
+                createdAt: tx.created_at,
+            },
+        });
+    }),
+
     /** GET /transactions/:id */
     getById: asyncHandler(async (req: Request, res: Response) => {
         const userId = req.user!.id;
         const { id } = req.params;
 
-        const tx = await transactionsRepo.getById(userId, id);
+        const tx = await transactionsRepo.getById(userId, String(id));
         if (!tx) throw new AppError("Transaction not found", 404, "RESOURCE_NOT_FOUND");
 
         sendSuccess(res, {

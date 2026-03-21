@@ -7,6 +7,7 @@ import {
     type TransactionType,
 } from "@/api/transactions.api";
 import { BottomNav } from "@/components/common/BottomNav";
+import { Icon } from "@/components/common/Icon";
 import "@/styles/dashboard.css";
 import "@/styles/transactions.css";
 
@@ -215,9 +216,7 @@ function DetailSheet({
             <div className="detail-sheet">
                 <div className="detail-sheet__topbar">
                     <button className="detail-sheet__close" onClick={onClose} aria-label="Đóng">
-                        <svg width="20" height="20" fill="none" viewBox="0 0 24 24">
-                            <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-                        </svg>
+                        <Icon name="close" size={20} />
                     </button>
                     <span className="detail-sheet__title">Thông tin giao dịch</span>
                     <div style={{ width: 28 }} />
@@ -304,9 +303,7 @@ function DropdownSheet<T extends string>({
                         {opt.icon && <span style={{ fontSize: 18 }}>{opt.icon}</span>}
                         {opt.label}
                         {opt.value === value && (
-                            <svg className="dropdown-option__check" width="16" height="16" fill="none" viewBox="0 0 24 24">
-                                <path d="M20 6L9 17l-5-5" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
-                            </svg>
+                            <Icon name="check" size={16} className="dropdown-option__check" />
                         )}
                     </button>
                 ))}
@@ -430,15 +427,11 @@ export const TransactionsPage = () => {
                         </div>
                         <div className="month-nav">
                             <button className="month-nav__btn" onClick={prevMonth} aria-label="Tháng trước">
-                                <svg width="16" height="16" fill="none" viewBox="0 0 24 24">
-                                    <path d="M15 18l-6-6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                                </svg>
+                                <Icon name="chevron_left" size={16} />
                             </button>
                             <span className="month-nav__label">Tháng: {MONTH_NAMES[month - 1]}</span>
                             <button className="month-nav__btn" onClick={nextMonth} aria-label="Tháng sau">
-                                <svg width="16" height="16" fill="none" viewBox="0 0 24 24">
-                                    <path d="M9 18l6-6-6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                                </svg>
+                                <Icon name="chevron_right" size={16} />
                             </button>
                         </div>
                     </div>
@@ -462,10 +455,7 @@ export const TransactionsPage = () => {
 
                 {/* Calendar toggle */}
                 <button className="txpage__cal-toggle" onClick={() => setShowCal((v) => !v)}>
-                    <svg width="18" height="18" fill="none" viewBox="0 0 24 24">
-                        <rect x="3" y="4" width="18" height="18" rx="2" stroke="currentColor" strokeWidth="2"/>
-                        <path d="M16 2v4M8 2v4M3 10h18" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-                    </svg>
+                    <Icon name="calendar_month" size={18} />
                     {showCal ? "Ẩn lịch" : "Hiện lịch"}
                 </button>
             </div>
@@ -517,10 +507,10 @@ export const TransactionsPage = () => {
                                     onClick={() => openDetail(tx.id)}
                                 >
                                     <div className="txcard__icon">
-                                        {tx.type === "income"     && "💰"}
-                                        {tx.type === "expense"    && "🛍️"}
-                                        {tx.type === "investment" && "📈"}
-                                        {tx.type === "saving"     && "🐖"}
+                                        {tx.type === "income"     && <Icon name="trending_up"       size={20} />}
+                                        {tx.type === "expense"    && <Icon name="shopping_bag"      size={20} />}
+                                        {tx.type === "investment" && <Icon name="candlestick_chart" size={20} />}
+                                        {tx.type === "saving"     && <Icon name="savings"           size={20} />}
                                     </div>
                                     <div className="txcard__body">
                                         <div className={`txcard__amount txcard__amount--${tx.type}`}>

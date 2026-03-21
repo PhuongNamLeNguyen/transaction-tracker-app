@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { settingsApi, type SettingsResponse, type UserPreferences } from "@/api/settings.api";
 import { BottomNav } from "@/components/common/BottomNav";
+import { Icon } from "@/components/common/Icon";
 import "@/styles/dashboard.css";
 import "@/styles/settings.css";
 
@@ -61,9 +62,7 @@ function PrefSheet<T extends string | number>({
                     >
                         {opt.label}
                         {opt.value === value && (
-                            <svg width="16" height="16" fill="none" viewBox="0 0 24 24">
-                                <path d="M20 6L9 17l-5-5" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
-                            </svg>
+                            <Icon name="check" size={16} />
                         )}
                     </button>
                 ))}
@@ -96,11 +95,7 @@ function LogoutDialog({ onConfirm, onCancel }: { onConfirm: () => void; onCancel
 
 /* ─── Chevron Icon ─── */
 function Chevron() {
-    return (
-        <svg className="settings-row__chevron" width="16" height="16" fill="none" viewBox="0 0 24 24">
-            <path d="M9 18l6-6-6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-        </svg>
-    );
+    return <Icon name="chevron_right" size={16} className="settings-row__chevron" />;
 }
 
 /* ─── Icon backgrounds ─── */

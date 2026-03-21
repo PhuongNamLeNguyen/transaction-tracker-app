@@ -1,44 +1,46 @@
 import { useNavigate, useLocation } from "react-router-dom";
 import { useState } from "react";
+import { Icon } from "@/components/common/Icon";
 
-/* ─── Bottom Sheet for FAB (shared) ─── */
+/* ─── Types ─── */
 type TxType = "income" | "expense" | "investment" | "saving";
 
 const TX_OPTIONS: Array<{ type: TxType; label: string; icon: string; desc: string }> = [
-    { type: "income",     label: "Nhập tiền thu",  icon: "💰", desc: "Ghi nhận khoản thu nhập" },
-    { type: "expense",    label: "Nhập tiền chi",  icon: "🛍️", desc: "Ghi nhận khoản chi tiêu" },
-    { type: "investment", label: "Đầu tư",          icon: "📈", desc: "Ghi nhận khoản đầu tư" },
-    { type: "saving",     label: "Tiết kiệm",       icon: "🐖", desc: "Ghi nhận khoản tiết kiệm" },
+    { type: "income",     label: "Nhập tiền thu",  icon: "trending_up",       desc: "Ghi nhận khoản thu nhập" },
+    { type: "expense",    label: "Nhập tiền chi",  icon: "shopping_bag",      desc: "Ghi nhận khoản chi tiêu" },
+    { type: "investment", label: "Đầu tư",          icon: "candlestick_chart", desc: "Ghi nhận khoản đầu tư" },
+    { type: "saving",     label: "Tiết kiệm",       icon: "savings",           desc: "Ghi nhận khoản tiết kiệm" },
 ];
 
 const INPUT_METHODS = [
-    { key: "camera",  label: "Chụp ảnh hóa đơn",   icon: "📷", desc: "Chụp ảnh để nhập tự động",  highlighted: true  },
-    { key: "gallery", label: "Tải ảnh từ thư viện", icon: "🖼️", desc: "Chọn ảnh đã chụp sẵn",     highlighted: false },
-    { key: "manual",  label: "Nhập thủ công",        icon: "✏️", desc: "Điền thông tin bằng tay",  highlighted: false },
+    { key: "camera",  label: "Chụp ảnh hóa đơn",   icon: "photo_camera", desc: "Chụp ảnh để nhập tự động",  highlighted: true  },
+    { key: "gallery", label: "Tải ảnh từ thư viện", icon: "image",        desc: "Chọn ảnh đã chụp sẵn",     highlighted: false },
+    { key: "manual",  label: "Nhập thủ công",        icon: "edit",         desc: "Điền thông tin bằng tay",  highlighted: false },
 ];
 
+/* ─── Sheet 1: chọn loại giao dịch ─── */
 function Sheet1({ onClose, onSelect }: { onClose: () => void; onSelect: (t: TxType) => void }) {
     return (
         <>
             <div className="sheet-overlay" onClick={onClose} />
             <div className="sheet">
                 <div className="sheet__handle" />
-                <div className="sheet__title">Tải hóa đơn</div>
+                <div className="sheet__title">Loại giao dịch</div>
                 <div className="sheet__options">
                     {TX_OPTIONS.map((opt) => (
                         <button
                             key={opt.type}
-                            className={`sheet-option${opt.type === "income" ? " sheet-option--income sheet-option--highlighted" : ""}`}
+                            className={`sheet-option sheet-option--${opt.type}`}
                             onClick={() => onSelect(opt.type)}
                         >
-                            <span className={`sheet-option__icon sheet-option__icon--${opt.type}`}>{opt.icon}</span>
+                            <span className={`sheet-option__icon sheet-option__icon--${opt.type}`}>
+                                <Icon name={opt.icon} size={22} />
+                            </span>
                             <span className="sheet-option__body">
                                 <span className="sheet-option__name">{opt.label}</span>
                                 <span className="sheet-option__desc">{opt.desc}</span>
                             </span>
-                            <svg className="sheet-option__chevron" width="18" height="18" fill="none" viewBox="0 0 24 24">
-                                <path d="M9 18l6-6-6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                            </svg>
+                            <Icon name="chevron_right" size={18} className="sheet-option__chevron" />
                         </button>
                     ))}
                 </div>
@@ -47,29 +49,40 @@ function Sheet1({ onClose, onSelect }: { onClose: () => void; onSelect: (t: TxTy
     );
 }
 
+/* ─── Sheet 2: chọn phương thức nhập ─── */
 function Sheet2({ txType, onClose }: { txType: TxType; onClose: () => void }) {
+    const navigate = useNavigate();
     const opt = TX_OPTIONS.find((o) => o.type === txType)!;
+
+    function handleSelect(key: string) {
+        onClose();
+        if (key === "manual") {
+            navigate(`/add-transaction?type=${txType}`);
+        }
+        // camera / gallery: TODO
+    }
+
     return (
         <>
             <div className="sheet-overlay" onClick={onClose} />
             <div className="sheet">
                 <div className="sheet__handle" />
-                <div className="sheet__title">Chọn phương thức nhập — {opt.label}</div>
+                <div className="sheet__title">Phương thức — {opt.label}</div>
                 <div className="sheet__options">
                     {INPUT_METHODS.map((m) => (
                         <button
                             key={m.key}
                             className={`sheet-option${m.highlighted ? " sheet-option--income sheet-option--highlighted" : ""}`}
-                            onClick={onClose}
+                            onClick={() => handleSelect(m.key)}
                         >
-                            <span className={`sheet-option__icon sheet-option__icon--${m.highlighted ? "income" : m.key === "gallery" ? "investment" : "saving"}`}>{m.icon}</span>
+                            <span className={`sheet-option__icon sheet-option__icon--${m.highlighted ? "income" : m.key === "gallery" ? "investment" : "saving"}`}>
+                                <Icon name={m.icon} size={22} />
+                            </span>
                             <span className="sheet-option__body">
                                 <span className="sheet-option__name">{m.label}</span>
                                 <span className="sheet-option__desc">{m.desc}</span>
                             </span>
-                            <svg className="sheet-option__chevron" width="18" height="18" fill="none" viewBox="0 0 24 24">
-                                <path d="M9 18l6-6-6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                            </svg>
+                            <Icon name="chevron_right" size={18} className="sheet-option__chevron" />
                         </button>
                     ))}
                 </div>
@@ -80,9 +93,9 @@ function Sheet2({ txType, onClose }: { txType: TxType; onClose: () => void }) {
 
 /* ─── Shared Bottom Nav ─── */
 export const BottomNav = () => {
-    const navigate  = useNavigate();
-    const { pathname } = useLocation();
-    const [fabOpen, setFabOpen] = useState(false);
+    const navigate      = useNavigate();
+    const { pathname }  = useLocation();
+    const [fabOpen, setFabOpen]             = useState(false);
     const [selectedTxType, setSelectedTxType] = useState<TxType | null>(null);
 
     function isActive(path: string) {
@@ -100,11 +113,7 @@ export const BottomNav = () => {
                     className={`bottom-nav__item${isActive("/") ? " bottom-nav__item--active" : ""}`}
                     onClick={() => navigate("/")}
                 >
-                    <svg width="22" height="22" fill="none" viewBox="0 0 24 24">
-                        <path d="M3 12L12 3l9 9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                        <path d="M9 21V12h6v9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                        <path d="M3 12v9h18v-9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
+                    <Icon name="home" size={22} filled={isActive("/")} />
                     Trang chủ
                 </button>
 
@@ -113,24 +122,18 @@ export const BottomNav = () => {
                     className={`bottom-nav__item${isActive("/transactions") ? " bottom-nav__item--active" : ""}`}
                     onClick={() => navigate("/transactions")}
                 >
-                    <svg width="22" height="22" fill="none" viewBox="0 0 24 24">
-                        <rect x="3" y="4" width="18" height="16" rx="2" stroke="currentColor" strokeWidth="2"/>
-                        <path d="M3 9h18" stroke="currentColor" strokeWidth="2"/>
-                        <path d="M9 14h6M9 17h4" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-                    </svg>
+                    <Icon name="receipt_long" size={22} filled={isActive("/transactions")} />
                     Chi tiết
                 </button>
 
-                {/* FAB center */}
+                {/* FAB */}
                 <div className="bottom-nav__fab-slot">
                     <button
                         className={`fab${fabOpen ? " fab--open" : ""}`}
                         onClick={() => setFabOpen((v) => !v)}
                         aria-label="Thêm giao dịch"
                     >
-                        <svg width="24" height="24" fill="none" viewBox="0 0 24 24">
-                            <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/>
-                        </svg>
+                        <Icon name={fabOpen ? "close" : "add"} size={24} />
                     </button>
                 </div>
 
@@ -139,10 +142,7 @@ export const BottomNav = () => {
                     className={`bottom-nav__item${isActive("/budgets") ? " bottom-nav__item--active" : ""}`}
                     onClick={() => navigate("/budgets")}
                 >
-                    <svg width="22" height="22" fill="none" viewBox="0 0 24 24">
-                        <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2"/>
-                        <path d="M12 7v5l3 3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
+                    <Icon name="account_balance_wallet" size={22} filled={isActive("/budgets")} />
                     Kế hoạch
                 </button>
 
@@ -151,10 +151,7 @@ export const BottomNav = () => {
                     className={`bottom-nav__item${isActive("/settings") ? " bottom-nav__item--active" : ""}`}
                     onClick={() => navigate("/settings")}
                 >
-                    <svg width="22" height="22" fill="none" viewBox="0 0 24 24">
-                        <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="2"/>
-                        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" stroke="currentColor" strokeWidth="2"/>
-                    </svg>
+                    <Icon name="settings" size={22} filled={isActive("/settings")} />
                     Cài đặt
                 </button>
             </nav>

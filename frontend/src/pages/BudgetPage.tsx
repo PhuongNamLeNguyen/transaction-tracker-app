@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { budgetApi, type BudgetResponse, type BudgetProgressItem } from "@/api/budget.api";
 import { BottomNav } from "@/components/common/BottomNav";
+import { Icon } from "@/components/common/Icon";
 import "@/styles/dashboard.css";
 import "@/styles/budget.css";
 
@@ -126,10 +127,7 @@ export const BudgetPage = () => {
                             </div>
                         </div>
                         <div className="period-card__icon">
-                            <svg width="20" height="20" fill="none" viewBox="0 0 24 24">
-                                <rect x="3" y="4" width="18" height="18" rx="2" stroke="currentColor" strokeWidth="2"/>
-                                <path d="M16 2v4M8 2v4M3 10h18" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-                            </svg>
+                            <Icon name="calendar_month" size={20} />
                         </div>
                     </div>
                 ) : null}

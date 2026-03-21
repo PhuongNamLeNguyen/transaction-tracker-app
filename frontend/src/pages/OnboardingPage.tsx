@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { onboardingApi, type Category } from "@/api/onboarding.api";
+import { Icon } from "@/components/common/Icon";
 import "@/styles/onboarding.css";
 
 /* ─── Constants ─────────────────────────────────────────────── */
@@ -39,43 +40,15 @@ const parseRaw = (s: string): number =>
 
 /* ─── Sub-components ────────────────────────────────────────── */
 
-/** Back arrow icon */
-const BackArrow = () => (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none"
-        stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M19 12H5M12 5l-7 7 7 7" />
-    </svg>
-);
-
-/** Calendar icon for step 1 select */
-const CalendarIcon = () => (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
-        stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <rect x="3" y="4" width="18" height="18" rx="2" />
-        <line x1="16" y1="2" x2="16" y2="6" />
-        <line x1="8" y1="2" x2="8" y2="6" />
-        <line x1="3" y1="10" x2="21" y2="10" />
-    </svg>
-);
-
-/** Currency icon for step 2 select */
-const CurrencyIcon = () => (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
-        stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <circle cx="12" cy="12" r="9" />
-        <path d="M14.8 9A2 2 0 0 0 13 8h-2a2 2 0 0 0 0 4h2a2 2 0 0 1 0 4h-2a2 2 0 0 1-1.8-1" />
-        <line x1="12" y1="6" x2="12" y2="8" />
-        <line x1="12" y1="16" x2="12" y2="18" />
-    </svg>
-);
-
-/** Chevron for FAQ */
-const ChevronIcon = ({ open }: { open: boolean }) => (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
-        stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"
-        style={{ transform: open ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}>
-        <path d="M6 9l6 6 6-6" />
-    </svg>
+const BackArrow   = () => <Icon name="arrow_back"        size={22} />;
+const CalendarIcon = () => <Icon name="calendar_month"    size={20} />;
+const CurrencyIcon = () => <Icon name="currency_exchange" size={20} />;
+const ChevronIcon  = ({ open }: { open: boolean }) => (
+    <Icon
+        name="expand_more"
+        size={14}
+        style={{ transform: open ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}
+    />
 );
 
 /* ─── Steps ──────────────────────────────────────────────────── */

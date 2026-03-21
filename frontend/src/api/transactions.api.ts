@@ -55,6 +55,24 @@ export interface TxCategory {
     type: string;
 }
 
+export interface CreateTransactionDto {
+    type: TransactionType;
+    amount: number;
+    transactionDate: string; // YYYY-MM-DD
+    categoryId: string;
+    note?: string;
+}
+
+export interface CreateTransactionResponse {
+    id: string;
+    type: TransactionType;
+    amount: number;
+    currency: string;
+    transactionDate: string;
+    note: string | null;
+    createdAt: string;
+}
+
 /* ─── API ─── */
 export const transactionsApi = {
     /** GET /transactions?year=&month=&type=&category_id= */
@@ -93,6 +111,18 @@ export const transactionsApi = {
         const res = await fetch(`${BASE}/transactions/${id}`, {
             headers: authHeaders(),
             credentials: "include",
+        });
+        if (!res.ok) throw await res.json();
+        return (await res.json()).data;
+    },
+
+    /** POST /transactions */
+    async create(dto: CreateTransactionDto): Promise<CreateTransactionResponse> {
+        const res = await fetch(`${BASE}/transactions`, {
+            method: "POST",
+            headers: authHeaders(),
+            credentials: "include",
+            body: JSON.stringify(dto),
         });
         if (!res.ok) throw await res.json();
         return (await res.json()).data;

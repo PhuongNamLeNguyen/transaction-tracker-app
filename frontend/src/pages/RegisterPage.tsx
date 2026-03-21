@@ -1,58 +1,11 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { authApi, type RegisterDto } from "@/api/auth.api";
+import { Icon } from "@/components/common/Icon";
 
-/* ─── SVG Icons ─── */
-const EyeIcon = () => (
-    <svg
-        width="20"
-        height="20"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        aria-hidden="true"
-    >
-        <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
-        <circle cx="12" cy="12" r="3" />
-    </svg>
-);
-
-const EyeOffIcon = () => (
-    <svg
-        width="20"
-        height="20"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        aria-hidden="true"
-    >
-        <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" />
-        <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" />
-        <line x1="2" y1="2" x2="22" y2="22" />
-    </svg>
-);
-
-const SpinnerIcon = () => (
-    <svg
-        width="20"
-        height="20"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2.5"
-        strokeLinecap="round"
-        aria-hidden="true"
-        className="spin-icon"
-    >
-        <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-    </svg>
-);
+const EyeIcon     = () => <Icon name="visibility"       size={20} />;
+const EyeOffIcon  = () => <Icon name="visibility_off"   size={20} />;
+const SpinnerIcon = () => <Icon name="progress_activity" size={20} className="spin-icon" />;
 
 /* ─── Types ─── */
 interface FormState {
@@ -75,19 +28,7 @@ const SuccessScreen = ({ email }: { email: string }) => (
     <main style={s.page}>
         <div style={s.inner}>
             <div style={s.successIcon} aria-hidden="true">
-                <svg
-                    width="40"
-                    height="40"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="var(--color-success)"
-                    strokeWidth="2.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                >
-                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-                    <polyline points="22 4 12 14.01 9 11.01" />
-                </svg>
+                <Icon name="check_circle" size={40} style={{ color: "var(--color-success)" }} filled />
             </div>
             <div style={{ textAlign: "center" }}>
                 <h1 style={s.successTitle}>Kiểm tra hộp thư của bạn</h1>
@@ -210,12 +151,6 @@ export const RegisterPage = () => {
 
     return (
         <>
-            <style>{`
-        @keyframes reg-spin { to { transform: rotate(360deg); } }
-        .spin-icon { animation: reg-spin 0.7s linear infinite; }
-        @media (prefers-reduced-motion: reduce) { .spin-icon { animation: none; } }
-      `}</style>
-
             <main style={s.page}>
                 <div style={s.inner}>
                     {/* ── Heading ── */}

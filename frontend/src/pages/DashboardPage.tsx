@@ -6,6 +6,7 @@ import {
     type DashboardTransaction,
 } from "@/api/dashboard.api";
 import { BottomNav } from "@/components/common/BottomNav";
+import { Icon } from "@/components/common/Icon";
 import "@/styles/dashboard.css";
 
 /* ─────────────────────────────────────────
@@ -196,10 +197,7 @@ export const DashboardPage = () => {
                     </div>
                 </div>
                 <button className="dash-header__bell" aria-label="Thông báo">
-                    <svg width="20" height="20" fill="none" viewBox="0 0 24 24">
-                        <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                        <path d="M13.73 21a2 2 0 0 1-3.46 0" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
+                    <Icon name="notifications" size={22} />
                 </button>
             </header>
 
@@ -214,16 +212,9 @@ export const DashboardPage = () => {
                             aria-label={balanceHidden ? "Hiện số dư" : "Ẩn số dư"}
                         >
                             {balanceHidden ? (
-                                <svg width="18" height="18" fill="none" viewBox="0 0 24 24">
-                                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                                    <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                                    <path d="M1 1l22 22" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-                                </svg>
+                                <Icon name="visibility_off" size={18} />
                             ) : (
-                                <svg width="18" height="18" fill="none" viewBox="0 0 24 24">
-                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                                    <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="2"/>
-                                </svg>
+                                <Icon name="visibility" size={18} />
                             )}
                         </button>
                     </div>
@@ -250,10 +241,7 @@ export const DashboardPage = () => {
                     <div className="cashflow-section__header">
                         <span className="cashflow-section__title">Thống kê dòng tiền trong tháng</span>
                         <div className="month-picker">
-                            <svg width="14" height="14" fill="none" viewBox="0 0 24 24">
-                                <rect x="3" y="4" width="18" height="18" rx="2" stroke="currentColor" strokeWidth="2"/>
-                                <path d="M16 2v4M8 2v4M3 10h18" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-                            </svg>
+                            <Icon name="calendar_month" size={14} />
                             {currentMonth}
                         </div>
                     </div>
@@ -327,10 +315,10 @@ export const DashboardPage = () => {
                             {data.transactions.map((tx: DashboardTransaction) => (
                                 <div key={tx.transactionId} className="txn-item">
                                     <div className={`txn-item__icon txn-item__icon--${tx.type}`}>
-                                        {tx.type === "income" && "💰"}
-                                        {tx.type === "expense" && "🛍️"}
-                                        {tx.type === "investment" && "📈"}
-                                        {tx.type === "saving" && "🐖"}
+                                        {tx.type === "income"     && <Icon name="trending_up"       size={20} />}
+                                        {tx.type === "expense"    && <Icon name="shopping_bag"      size={20} />}
+                                        {tx.type === "investment" && <Icon name="candlestick_chart" size={20} />}
+                                        {tx.type === "saving"     && <Icon name="savings"           size={20} />}
                                     </div>
                                     <div className="txn-item__body">
                                         <div className="txn-item__name">
