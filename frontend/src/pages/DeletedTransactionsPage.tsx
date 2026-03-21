@@ -80,47 +80,90 @@ function SwipeDeletedRow({
     onPermanentDelete: (item: DeletedSplitItem) => void;
 }) {
     const [offsetX, setOffsetX] = useState(0);
-    const [dragging, setDragging] = useState(false);
-    const startX = useRef(0);
-    const rowRef = useRef<HTMLDivElement>(null);
+    const [active,  setActive]  = useState(false);
 
-    function onPointerDown(e: React.PointerEvent) {
-        if (selectMode) return;
-        startX.current = e.clientX;
-        setDragging(true);
-        (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-    }
+    const onRestoreRef          = useRef(onRestore);
+    const onPermanentDeleteRef  = useRef(onPermanentDelete);
+    const selectModeRef         = useRef(selectMode);
+    const startX                = useRef(0);
+    const startY                = useRef(0);
+    const isHoriz               = useRef<boolean | null>(null);
+    const latestOffset          = useRef(0);
+    const rowRef                = useRef<HTMLDivElement>(null);
+    const contentRef            = useRef<HTMLDivElement>(null);
 
-    function onPointerMove(e: React.PointerEvent) {
-        if (!dragging) return;
-        const dx = e.clientX - startX.current;
-        const clamped = Math.max(-ACTION_WIDTH * 1.4, Math.min(ACTION_WIDTH * 1.4, dx));
-        setOffsetX(clamped);
-    }
+    useEffect(() => { onRestoreRef.current         = onRestore; },         [onRestore]);
+    useEffect(() => { onPermanentDeleteRef.current  = onPermanentDelete; }, [onPermanentDelete]);
+    useEffect(() => { selectModeRef.current         = selectMode; },        [selectMode]);
+    useEffect(() => { latestOffset.current          = offsetX; },           [offsetX]);
 
-    function onPointerUp() {
-        if (!dragging) return;
-        setDragging(false);
-        const rowW = rowRef.current?.offsetWidth ?? 320;
+    useEffect(() => {
+        const el = contentRef.current;
+        if (!el) return;
 
-        if (offsetX <= -(rowW * SWIPE_THRESHOLD)) {
-            // Full left — trigger permanent delete
-            setOffsetX(0);
-            onPermanentDelete(item);
-        } else if (offsetX <= -ACTION_WIDTH * 0.6) {
-            // Reveal delete button
-            setOffsetX(-ACTION_WIDTH);
-        } else if (offsetX >= rowW * SWIPE_THRESHOLD) {
-            // Full right — restore
-            setOffsetX(0);
-            onRestore(item);
-        } else if (offsetX >= ACTION_WIDTH * 0.6) {
-            // Reveal restore button
-            setOffsetX(ACTION_WIDTH);
-        } else {
-            setOffsetX(0);
+        function onTouchStart(e: TouchEvent) {
+            if (selectModeRef.current) return;
+            const t = e.touches[0];
+            startX.current  = t.clientX;
+            startY.current  = t.clientY;
+            isHoriz.current = null;
+            setActive(true);
         }
-    }
+
+        function onTouchMove(e: TouchEvent) {
+            if (selectModeRef.current) return;
+            const t   = e.touches[0];
+            const dx  = t.clientX - startX.current;
+            const dy  = t.clientY - startY.current;
+            const adx = Math.abs(dx);
+            const ady = Math.abs(dy);
+
+            if (isHoriz.current === null) {
+                if (adx < 3 && ady < 3) return;
+                isHoriz.current = adx > ady;
+            }
+            if (!isHoriz.current) return;
+
+            e.preventDefault();
+            const next = Math.max(-ACTION_WIDTH * 1.4, Math.min(ACTION_WIDTH * 1.4, dx));
+            latestOffset.current = next;
+            setOffsetX(next);
+        }
+
+        function onTouchEnd() {
+            setActive(false);
+            if (selectModeRef.current || !isHoriz.current) return;
+
+            const rowW = rowRef.current?.offsetWidth ?? 320;
+            const off  = latestOffset.current;
+
+            if (off <= -(rowW * SWIPE_THRESHOLD)) {
+                setOffsetX(0);
+                onPermanentDeleteRef.current(item);
+            } else if (off <= -ACTION_WIDTH * 0.6) {
+                setOffsetX(-ACTION_WIDTH);
+            } else if (off >= rowW * SWIPE_THRESHOLD) {
+                setOffsetX(0);
+                onRestoreRef.current(item);
+            } else if (off >= ACTION_WIDTH * 0.6) {
+                setOffsetX(ACTION_WIDTH);
+            } else {
+                setOffsetX(0);
+            }
+        }
+
+        el.addEventListener("touchstart",  onTouchStart,  { passive: true });
+        el.addEventListener("touchmove",   onTouchMove,   { passive: false });
+        el.addEventListener("touchend",    onTouchEnd,    { passive: true });
+        el.addEventListener("touchcancel", onTouchEnd,    { passive: true });
+
+        return () => {
+            el.removeEventListener("touchstart",  onTouchStart);
+            el.removeEventListener("touchmove",   onTouchMove);
+            el.removeEventListener("touchend",    onTouchEnd);
+            el.removeEventListener("touchcancel", onTouchEnd);
+        };
+    }, [item]); // stable — callbacks accessed via refs
 
     return (
         <div className="dlt-swipe-row" ref={rowRef}>
@@ -150,15 +193,12 @@ function SwipeDeletedRow({
 
             {/* Content */}
             <div
+                ref={contentRef}
                 className={`dlt-swipe-row__content${selected ? " dlt-swipe-row__content--selected" : ""}`}
                 style={{
                     transform: selectMode ? "translateX(0)" : `translateX(${offsetX}px)`,
-                    transition: dragging ? "none" : "transform 0.2s ease",
+                    transition: active ? "none" : "transform 0.2s ease",
                 }}
-                onPointerDown={onPointerDown}
-                onPointerMove={onPointerMove}
-                onPointerUp={onPointerUp}
-                onPointerCancel={onPointerUp}
                 onClick={() => selectMode && onToggleSelect(item.id)}
             >
                 {selectMode && (

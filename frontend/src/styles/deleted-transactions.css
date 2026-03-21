@@ -77,7 +77,7 @@
     position: relative;
     overflow: hidden;
     border-radius: var(--radius-lg);
-    touch-action: pan-y;
+    touch-action: none;
     user-select: none;
     background: var(--color-surface);
     box-shadow: var(--shadow-xs);

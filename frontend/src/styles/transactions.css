@@ -485,7 +485,7 @@
     overflow: hidden;
     border-radius: var(--radius-md);
     background: var(--color-error-bg);
-    touch-action: pan-y;
+    touch-action: none; /* JS handles all touch — prevents browser from stealing horizontal swipe */
     user-select: none;
 }
 

@@ -217,60 +217,109 @@ function SwipeSplitRow({
     currency: string;
     onDelete: (id: string) => void;
 }) {
-    const [offsetX, setOffsetX] = useState(0);
-    // Use refs (not state) for dragging/revealed so event handlers always read
-    // the latest value without stale-closure bugs across renders.
-    const isDragging = useRef(false);
-    const isRevealed = useRef(false);
-    const startX    = useRef(0);
-    const rowRef    = useRef<HTMLDivElement>(null);
+    const [offsetX, setOffsetX]     = useState(0);
+    const [active,  setActive]      = useState(false); // true while finger is down → disable transition
+
+    // All mutable swipe state lives in refs so native event handlers never capture stale values.
+    const onDeleteRef   = useRef(onDelete);
+    const isRevealed    = useRef(false);
+    const startX        = useRef(0);
+    const startY        = useRef(0);
+    const isHoriz       = useRef<boolean | null>(null); // null = direction not yet decided
+    const latestOffset  = useRef(0);                    // mirrors offsetX for use inside handlers
+    const rowRef        = useRef<HTMLDivElement>(null);
+    const contentRef    = useRef<HTMLDivElement>(null);
+
+    // Keep onDeleteRef current so the effect closure doesn't go stale.
+    useEffect(() => { onDeleteRef.current = onDelete; }, [onDelete]);
+    // Keep latestOffset in sync.
+    useEffect(() => { latestOffset.current = offsetX; }, [offsetX]);
 
     const ACTION_WIDTH = 80;
 
-    function onPointerDown(e: React.PointerEvent) {
-        startX.current = e.clientX;
-        isDragging.current = true;
-        (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-    }
+    useEffect(() => {
+        const el = contentRef.current;
+        if (!el) return;
 
-    function onPointerMove(e: React.PointerEvent) {
-        if (!isDragging.current) return;
-        const dx = e.clientX - startX.current;
-        // Offset starting position when button is already revealed
-        const base = isRevealed.current ? -ACTION_WIDTH : 0;
-        const raw  = base + dx;
-        // Only leftward movement (negative); clamp to 1.4× action width
-        setOffsetX(Math.max(-ACTION_WIDTH * 1.4, Math.min(0, raw)));
-    }
-
-    function onPointerUp() {
-        if (!isDragging.current) return;
-        isDragging.current = false;
-        const rowW     = rowRef.current?.offsetWidth ?? 320;
-        const absOffset = Math.abs(offsetX);
-
-        if (absOffset >= rowW * SWIPE_THRESHOLD) {
-            // Past 50% — delete immediately
-            setOffsetX(0);
-            isRevealed.current = false;
-            onDelete(split.id);
-        } else if (absOffset >= ACTION_WIDTH * 0.6) {
-            // Snap to reveal delete button
-            setOffsetX(-ACTION_WIDTH);
-            isRevealed.current = true;
-        } else {
-            // Snap back
-            setOffsetX(0);
-            isRevealed.current = false;
+        function onTouchStart(e: TouchEvent) {
+            const t = e.touches[0];
+            startX.current  = t.clientX;
+            startY.current  = t.clientY;
+            isHoriz.current = null;
+            setActive(true);
         }
-    }
+
+        function onTouchMove(e: TouchEvent) {
+            const t   = e.touches[0];
+            const dx  = t.clientX - startX.current;
+            const dy  = t.clientY - startY.current;
+            const adx = Math.abs(dx);
+            const ady = Math.abs(dy);
+
+            // Detect direction on the same event — never return before calling preventDefault.
+            if (isHoriz.current === null) {
+                if (adx < 3 && ady < 3) return; // not enough movement yet
+                isHoriz.current = adx > ady;
+            }
+
+            if (!isHoriz.current) return; // confirmed vertical — let scroll happen
+
+            // MUST be called before the browser starts a scroll gesture.
+            e.preventDefault();
+
+            const base = isRevealed.current ? -ACTION_WIDTH : 0;
+            const next = Math.max(-ACTION_WIDTH * 1.4, Math.min(0, base + dx));
+            latestOffset.current = next;
+            setOffsetX(next);
+        }
+
+        function onTouchEnd() {
+            setActive(false);
+            if (!isHoriz.current) return; // was a vertical swipe — nothing to do
+
+            const rowW   = rowRef.current?.offsetWidth ?? 320;
+            const abs    = Math.abs(latestOffset.current);
+
+            if (abs >= rowW * SWIPE_THRESHOLD) {
+                // Swiped past threshold — delete immediately
+                setOffsetX(0);
+                isRevealed.current = false;
+                onDeleteRef.current(split.id);
+            } else if (abs >= ACTION_WIDTH * 0.6) {
+                // Snap to reveal delete button
+                setOffsetX(-ACTION_WIDTH);
+                isRevealed.current = true;
+            } else {
+                // Snap back
+                setOffsetX(0);
+                isRevealed.current = false;
+            }
+        }
+
+        // passive: false on touchmove is the critical part — lets us call e.preventDefault()
+        el.addEventListener("touchstart",  onTouchStart,  { passive: true });
+        el.addEventListener("touchmove",   onTouchMove,   { passive: false });
+        el.addEventListener("touchend",    onTouchEnd,    { passive: true });
+        el.addEventListener("touchcancel", onTouchEnd,    { passive: true });
+
+        return () => {
+            el.removeEventListener("touchstart",  onTouchStart);
+            el.removeEventListener("touchmove",   onTouchMove);
+            el.removeEventListener("touchend",    onTouchEnd);
+            el.removeEventListener("touchcancel", onTouchEnd);
+        };
+    }, [split.id]); // stable — onDelete accessed via ref
 
     return (
         <div className="swipe-row" ref={rowRef}>
             <div className="swipe-row__action">
                 <button
                     className="swipe-row__delete-btn"
-                    onClick={() => { setOffsetX(0); isRevealed.current = false; onDelete(split.id); }}
+                    onClick={() => {
+                        setOffsetX(0);
+                        isRevealed.current = false;
+                        onDelete(split.id);
+                    }}
                     type="button"
                 >
                     <Icon name="delete" size={18} />
@@ -278,15 +327,12 @@ function SwipeSplitRow({
                 </button>
             </div>
             <div
+                ref={contentRef}
                 className="swipe-row__content"
                 style={{
-                    transform: `translateX(${offsetX}px)`,
-                    transition: isDragging.current ? "none" : "transform 0.2s ease",
+                    transform:  `translateX(${offsetX}px)`,
+                    transition: active ? "none" : "transform 0.2s ease",
                 }}
-                onPointerDown={onPointerDown}
-                onPointerMove={onPointerMove}
-                onPointerUp={onPointerUp}
-                onPointerCancel={onPointerUp}
             >
                 <span className="detail-row__value">{split.categoryName}</span>
                 <span className="detail-row__value" style={{ fontWeight: 600 }}>
