@@ -64,6 +64,13 @@ export interface RefreshResponse {
 }
 
 /* ────────────────────────────────────────────────────────────
+   Refresh deduplication — React StrictMode double-invokes effects,
+   so two simultaneous refresh calls would rotate & revoke the same
+   session. We deduplicate by reusing the in-flight promise.
+───────────────────────────────────────────────────────────── */
+let refreshInFlight: Promise<RefreshResponse> | null = null;
+
+/* ────────────────────────────────────────────────────────────
    Auth API
 ───────────────────────────────────────────────────────────── */
 export const authApi = {
@@ -117,13 +124,20 @@ export const authApi = {
      * Returns: { accessToken, refreshToken, user }
      */
     async refresh(): Promise<RefreshResponse> {
-        const res = await fetch(`${BASE}/auth/refresh`, {
+        if (refreshInFlight) return refreshInFlight;
+        refreshInFlight = fetch(`${BASE}/auth/refresh`, {
             method: "POST",
             headers: jsonHeaders(),
-            credentials: "include", // gửi cookie chứa refresh token
-        });
-        if (!res.ok) throw await res.json();
-        return (await res.json()).data;
+            credentials: "include",
+        })
+            .then(async (res) => {
+                if (!res.ok) throw await res.json();
+                return (await res.json()).data as RefreshResponse;
+            })
+            .finally(() => {
+                refreshInFlight = null;
+            });
+        return refreshInFlight;
     },
 
     /**
