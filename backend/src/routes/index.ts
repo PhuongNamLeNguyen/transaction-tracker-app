@@ -5,6 +5,8 @@ import { dashboardRouter } from "./dashboard.routes";
 import { transactionsRouter } from "./transactions.routes";
 import { budgetRouter } from "./budget.routes";
 import { settingsRouter } from "./settings.routes";
+import { receiptsRouter } from "./receipts.routes";
+import { aiRouter } from "./ai.routes";
 
 export const router = Router();
 
@@ -14,3 +16,5 @@ router.use("/dashboard", dashboardRouter);
 router.use("/transactions", transactionsRouter);
 router.use("/budget", budgetRouter);
 router.use("/settings", settingsRouter);
+router.use("/receipts", receiptsRouter);
+router.use("/ai", aiRouter);
