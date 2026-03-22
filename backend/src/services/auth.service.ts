@@ -1,6 +1,7 @@
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import jwt from "jsonwebtoken";
+import { OAuth2Client } from "google-auth-library";
 import { env } from "../config/env";
 import { userRepo } from "../repositories/user.repo";
 import { sessionRepo } from "../repositories/session.repo";
@@ -107,6 +108,11 @@ export const authService = {
             throw new AppError("Invalid credentials", 401, "UNAUTHORIZED");
         }
 
+        if (!user.password_hash) {
+            // OAuth-only account — no password set
+            throw new AppError("Invalid credentials", 401, "UNAUTHORIZED");
+        }
+
         const validPassword = await bcrypt.compare(
             password,
             user.password_hash,
@@ -188,6 +194,81 @@ export const authService = {
     // Logout → revoke session, clear cookie
     logout: async (userId: string) => {
         await sessionRepo.revokeAllUserSessions(userId);
+    },
+
+    // Google OAuth → exchange code for user info, find/create user, issue tokens
+    handleGoogleOAuth: async (
+        code: string,
+        deviceInfo?: string,
+        ipAddress?: string,
+    ) => {
+        const oauth2Client = new OAuth2Client(
+            env.googleClientId,
+            env.googleClientSecret,
+            env.googleRedirectUri,
+        );
+
+        const { tokens } = await oauth2Client.getToken(code);
+        if (!tokens.id_token) {
+            throw new AppError("Google authentication failed", 401, "UNAUTHORIZED");
+        }
+
+        const ticket = await oauth2Client.verifyIdToken({
+            idToken: tokens.id_token,
+            audience: env.googleClientId,
+        });
+        const payload = ticket.getPayload();
+        if (!payload?.sub || !payload.email) {
+            throw new AppError("Google authentication failed", 401, "UNAUTHORIZED");
+        }
+
+        const googleId = payload.sub;
+        const email = payload.email;
+        const name = payload.name ?? email.split("@")[0];
+
+        // Find existing user by google_id, then by email (for account linking)
+        let user = await userRepo.findByGoogleId(googleId);
+
+        if (!user) {
+            user = await userRepo.findByEmail(email);
+            if (user) {
+                // Link Google to existing email account
+                await userRepo.linkGoogleId(user.id, googleId);
+                user = await userRepo.findById(user.id);
+            } else {
+                // Brand new user via Google
+                user = await userRepo.createOAuthUser(email, name, googleId);
+                await userRepo.createSettings(user.id);
+            }
+        }
+
+        const accessToken = signAccessToken({
+            id: user.id,
+            email: user.email,
+            is_verified: true,
+        });
+        const rawRefreshToken = generateRawToken();
+        const refreshTokenHash = await bcrypt.hash(rawRefreshToken, BCRYPT_ROUNDS);
+        const expiredAt = new Date(Date.now() + REFRESH_TOKEN_TTL_REMEMBER_MS);
+
+        await sessionRepo.createSession(
+            user.id,
+            refreshTokenHash,
+            expiredAt,
+            deviceInfo,
+            ipAddress,
+        );
+
+        return {
+            accessToken,
+            refreshToken: rawRefreshToken,
+            user: {
+                id: user.id,
+                email: user.email,
+                name: user.name ?? "",
+                isVerified: true,
+            },
+        };
     },
 
     // Forgot password → tạo reset token, gửi email

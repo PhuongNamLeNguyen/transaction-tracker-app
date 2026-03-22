@@ -11,6 +11,7 @@ import { SettingsPage } from "@/pages/SettingsPage";
 import { AddTransactionPage } from "@/pages/AddTransactionPage";
 import { ReceiptReviewPage } from "@/pages/ReceiptReviewPage";
 import { DeletedTransactionsPage } from "@/pages/DeletedTransactionsPage";
+import { OAuthCallbackPage } from "@/pages/OAuthCallbackPage";
 
 /*
   Route structure:
@@ -47,6 +48,9 @@ export const router = createBrowserRouter([
             // { path: '/settings',         element: <SettingsPage /> },
         ],
     },
+
+    /* ── OAuth callback — outside auth guards, handles token from hash fragment ── */
+    { path: "/oauth/callback", element: <OAuthCallbackPage /> },
 
     /* ── Fallback ── */
     { path: "*", element: <Navigate to="/" replace /> },

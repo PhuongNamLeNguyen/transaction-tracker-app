@@ -1,7 +1,9 @@
 import { Request, Response } from "express";
+import { OAuth2Client } from "google-auth-library";
 import { authService } from "../services/auth.service";
 import { asyncHandler } from "../utils/asyncHandler";
 import { sendSuccess } from "../utils/response";
+import { env } from "../config/env";
 
 const REFRESH_COOKIE_NAME = "refresh_token";
 const COOKIE_OPTIONS = {
@@ -99,5 +101,58 @@ export const authController = {
         const { token, newPassword } = req.body; // bỏ userId
         await authService.resetPassword(token, newPassword);
         sendSuccess(res, { message: "Password reset. Please log in again." });
+    }),
+
+    googleRedirect: asyncHandler(async (_req: Request, res: Response) => {
+        if (!env.googleClientId) {
+            throw Object.assign(new Error("Google OAuth is not configured"), {
+                statusCode: 501,
+                code: "NOT_IMPLEMENTED",
+            });
+        }
+        const oauth2Client = new OAuth2Client(
+            env.googleClientId,
+            env.googleClientSecret,
+            env.googleRedirectUri,
+        );
+        const authUrl = oauth2Client.generateAuthUrl({
+            access_type: "offline",
+            scope: ["email", "profile"],
+            prompt: "select_account",
+        });
+        res.redirect(authUrl);
+    }),
+
+    googleCallback: asyncHandler(async (req: Request, res: Response) => {
+        const { code, error } = req.query;
+
+        if (error || !code) {
+            return res.redirect(`${env.frontendUrl}/login?error=oauth_cancelled`);
+        }
+
+        try {
+            const result = await authService.handleGoogleOAuth(
+                code as string,
+                req.headers["user-agent"],
+                req.ip,
+            );
+
+            const cookieOptions = {
+                httpOnly: true,
+                secure: process.env.NODE_ENV === "production",
+                sameSite: "lax" as const,
+                path: "/",
+                maxAge: 30 * 24 * 60 * 60 * 1000,
+            };
+
+            res.cookie("refresh_token", result.refreshToken, cookieOptions);
+
+            const userEncoded = Buffer.from(JSON.stringify(result.user)).toString("base64url");
+            res.redirect(
+                `${env.frontendUrl}/oauth/callback#access_token=${result.accessToken}&user=${userEncoded}`,
+            );
+        } catch {
+            res.redirect(`${env.frontendUrl}/login?error=oauth_failed`);
+        }
     }),
 };

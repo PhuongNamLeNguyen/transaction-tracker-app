@@ -48,4 +48,30 @@ export const userRepo = {
             [userId, passwordHash],
         );
     },
+
+    findByGoogleId: async (googleId: string) => {
+        const result = await query(
+            "SELECT * FROM users WHERE google_id = $1 LIMIT 1",
+            [googleId],
+        );
+        return result.rows[0] ?? null;
+    },
+
+    createOAuthUser: async (email: string, name: string, googleId: string) => {
+        const result = await query(
+            `INSERT INTO users (email, name, google_id, is_verified)
+       VALUES ($1, $2, $3, true)
+       RETURNING id, email, name, is_verified, created_at`,
+            [email, name, googleId],
+        );
+        return result.rows[0];
+    },
+
+    linkGoogleId: async (userId: string, googleId: string) => {
+        await query(
+            `UPDATE users SET google_id = $2, is_verified = true, updated_at = now()
+       WHERE id = $1`,
+            [userId, googleId],
+        );
+    },
 };

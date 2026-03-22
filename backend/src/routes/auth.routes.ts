@@ -34,3 +34,7 @@ authRouter.post(
 
 // Protected — cần JWT (logout cần biết user id)
 authRouter.post("/logout", authenticate, authController.logout);
+
+// Google OAuth
+authRouter.get("/google", authController.googleRedirect);
+authRouter.get("/google/callback", authController.googleCallback);
