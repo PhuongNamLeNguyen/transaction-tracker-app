@@ -1,18 +1,46 @@
 import { query, pool } from "../db/client";
+import type { PoolClient } from "pg";
+
+/* Recalculate accounts.balance from all confirmed, non-deleted transactions */
+async function recalcBalance(userId: string, client: PoolClient) {
+    await client.query(
+        `UPDATE accounts
+         SET    balance = (
+             SELECT COALESCE(SUM(
+                 CASE WHEN t.type = 'income' THEN t.amount ELSE -t.amount END
+             ), 0)
+             FROM   transactions t
+             WHERE  t.user_id    = $1
+               AND  t.status     = 'confirmed'
+               AND  t.deleted_at IS NULL
+         )
+         WHERE  user_id = $1`,
+        [userId],
+    );
+}
 
 export const transactionsRepo = {
-    /* ─── List transactions for a given month ─── */
-    listByMonth: async (
+    /* ─── List transactions — year/month are optional ─── */
+    list: async (
         userId: string,
-        year: number,
-        month: number,
+        year?: number,
+        month?: number,
         type?: string,
         categoryId?: string,
     ) => {
-        const params: unknown[] = [userId, year, month];
+        const params: unknown[] = [userId];
+        let dateClause = "";
         let typeClause = "";
         let categoryClause = "";
 
+        if (year != null) {
+            params.push(year);
+            dateClause = `AND EXTRACT(YEAR FROM t.transaction_date) = $${params.length}`;
+            if (month != null) {
+                params.push(month);
+                dateClause += `\n               AND EXTRACT(MONTH FROM t.transaction_date) = $${params.length}`;
+            }
+        }
         if (type) {
             params.push(type);
             typeClause = `AND t.type = $${params.length}`;
@@ -48,8 +76,7 @@ export const transactionsRepo = {
              WHERE  t.user_id    = $1
                AND  t.status     = 'confirmed'
                AND  t.deleted_at IS NULL
-               AND  EXTRACT(YEAR  FROM t.transaction_date) = $2
-               AND  EXTRACT(MONTH FROM t.transaction_date) = $3
+               ${dateClause}
                ${typeClause}
                ${categoryClause}
              GROUP BY t.id, t.transaction_date, t.created_at, t.type,
@@ -181,8 +208,36 @@ export const transactionsRepo = {
                 receiptId,
             ]);
 
+            await recalcBalance(userId, client);
             await client.query("COMMIT");
             return tx;
+        } catch (err) {
+            await client.query("ROLLBACK");
+            throw err;
+        } finally {
+            client.release();
+        }
+    },
+
+    /* ─── Soft-delete a transaction (sets deleted_at = now()) + recalc balance ─── */
+    softDeleteTransaction: async (userId: string, transactionId: string) => {
+        const client = await pool.connect();
+        try {
+            await client.query("BEGIN");
+            const result = await client.query(
+                `UPDATE transactions
+                 SET    deleted_at = now()
+                 WHERE  id         = $1
+                   AND  user_id    = $2
+                   AND  deleted_at IS NULL
+                 RETURNING id`,
+                [transactionId, userId],
+            );
+            if (result.rows[0]) {
+                await recalcBalance(userId, client);
+            }
+            await client.query("COMMIT");
+            return result.rows[0] ?? null;
         } catch (err) {
             await client.query("ROLLBACK");
             throw err;
@@ -272,6 +327,79 @@ export const transactionsRepo = {
         return result.rowCount ?? 0;
     },
 
+    /* ─── List all soft-deleted transactions for a user ─── */
+    getDeletedTransactions: async (userId: string) => {
+        const result = await query(
+            `SELECT  t.id,
+                     t.type            AS transaction_type,
+                     t.amount,
+                     t.currency,
+                     t.transaction_date,
+                     t.note,
+                     t.deleted_at
+             FROM   transactions t
+             WHERE  t.user_id    = $1
+               AND  t.deleted_at IS NOT NULL
+             ORDER BY t.deleted_at DESC`,
+            [userId],
+        );
+        return result.rows;
+    },
+
+    /* ─── Restore a soft-deleted transaction + recalc balance ─── */
+    restoreTransaction: async (userId: string, transactionId: string) => {
+        const client = await pool.connect();
+        try {
+            await client.query("BEGIN");
+            const result = await client.query(
+                `UPDATE transactions
+                 SET    deleted_at = NULL
+                 WHERE  id         = $1
+                   AND  user_id    = $2
+                   AND  deleted_at IS NOT NULL
+                 RETURNING id`,
+                [transactionId, userId],
+            );
+            if (result.rows[0]) {
+                await recalcBalance(userId, client);
+            }
+            await client.query("COMMIT");
+            return result.rows[0] ?? null;
+        } catch (err) {
+            await client.query("ROLLBACK");
+            throw err;
+        } finally {
+            client.release();
+        }
+    },
+
+    /* ─── Hard-delete a soft-deleted transaction (with its splits) ─── */
+    hardDeleteTransaction: async (userId: string, transactionId: string) => {
+        const client = await pool.connect();
+        try {
+            await client.query("BEGIN");
+            await client.query(
+                `DELETE FROM transaction_splits WHERE transaction_id = $1`,
+                [transactionId],
+            );
+            const result = await client.query(
+                `DELETE FROM transactions
+                 WHERE  id         = $1
+                   AND  user_id    = $2
+                   AND  deleted_at IS NOT NULL
+                 RETURNING id`,
+                [transactionId, userId],
+            );
+            await client.query("COMMIT");
+            return result.rows[0] ?? null;
+        } catch (err) {
+            await client.query("ROLLBACK");
+            throw err;
+        } finally {
+            client.release();
+        }
+    },
+
     /* ─── List all soft-deleted splits for a user ─── */
     getDeletedSplits: async (userId: string) => {
         const result = await query(
@@ -298,7 +426,7 @@ export const transactionsRepo = {
         return result.rows;
     },
 
-    /* ─── Create a manual transaction with a single split ─── */
+    /* ─── Create a manual transaction with a single split + recalc balance ─── */
     create: async (params: {
         userId: string;
         accountId: string;
@@ -310,22 +438,30 @@ export const transactionsRepo = {
         note?: string;
     }) => {
         const { userId, accountId, type, amount, currency, transactionDate, categoryId, note } = params;
-
-        const txResult = await query(
-            `INSERT INTO transactions
-               (user_id, account_id, type, amount, currency, status, source, transaction_date, note)
-             VALUES ($1, $2, $3, $4, $5, 'confirmed', 'manual', $6, $7)
-             RETURNING id, type, amount, currency, transaction_date, note, created_at`,
-            [userId, accountId, type, amount, currency, transactionDate, note ?? null],
-        );
-        const tx = txResult.rows[0];
-
-        await query(
-            `INSERT INTO transaction_splits (transaction_id, category_id, amount)
-             VALUES ($1, $2, $3)`,
-            [tx.id, categoryId, amount],
-        );
-
-        return tx;
+        const client = await pool.connect();
+        try {
+            await client.query("BEGIN");
+            const txResult = await client.query(
+                `INSERT INTO transactions
+                   (user_id, account_id, type, amount, currency, status, source, transaction_date, note)
+                 VALUES ($1, $2, $3, $4, $5, 'confirmed', 'manual', $6, $7)
+                 RETURNING id, type, amount, currency, transaction_date, note, created_at`,
+                [userId, accountId, type, amount, currency, transactionDate, note ?? null],
+            );
+            const tx = txResult.rows[0];
+            await client.query(
+                `INSERT INTO transaction_splits (transaction_id, category_id, amount)
+                 VALUES ($1, $2, $3)`,
+                [tx.id, categoryId, amount],
+            );
+            await recalcBalance(userId, client);
+            await client.query("COMMIT");
+            return tx;
+        } catch (err) {
+            await client.query("ROLLBACK");
+            throw err;
+        } finally {
+            client.release();
+        }
     },
 };

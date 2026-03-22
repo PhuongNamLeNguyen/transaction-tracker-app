@@ -24,6 +24,14 @@ export const settingsRepo = {
         };
     },
 
+    /* ─── Update user display name ─── */
+    updateUserName: async (userId: string, name: string) => {
+        await query(
+            `UPDATE users SET name = $2, updated_at = now() WHERE id = $1`,
+            [userId, name],
+        );
+    },
+
     /* ─── Partial update of user_settings ─── */
     updateSettings: async (
         userId: string,

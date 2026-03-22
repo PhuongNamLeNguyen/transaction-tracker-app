@@ -103,16 +103,16 @@ export interface Merchant {
     updatedAt: string;
 }
 
-export interface BudgetPeriod {
+export interface PlanPeriod {
     id: string;
     userId: string;
     startDate: string;
     endDate: string;
     createdAt: string;
-    budgets?: Budget[];
+    plans?: Plan[];
 }
 
-export interface Budget {
+export interface Plan {
     id: string;
     periodId: string;
     categoryId: string;

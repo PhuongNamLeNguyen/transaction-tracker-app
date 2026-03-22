@@ -35,7 +35,7 @@ export const router = createBrowserRouter([
             { path: "/onboarding",    element: <OnboardingPage /> },
             { path: "/",              element: <DashboardPage /> },
             { path: "/transactions",  element: <TransactionsPage /> },
-            { path: "/budgets",       element: <BudgetPage /> },
+            { path: "/plans",         element: <BudgetPage /> },
             { path: "/settings",          element: <SettingsPage /> },
             { path: "/add-transaction",   element: <AddTransactionPage /> },
             { path: "/receipt-review",         element: <ReceiptReviewPage /> },
@@ -43,7 +43,7 @@ export const router = createBrowserRouter([
             // Các route sau sẽ thêm dần theo từng feature:
             // { path: '/transactions/:id', element: <TransactionDetailPage /> },
             // { path: '/accounts',         element: <AccountsPage /> },
-            // { path: '/budgets',          element: <BudgetsPage /> },
+            // { path: '/plans',            element: <PlansPage /> },
             // { path: '/settings',         element: <SettingsPage /> },
         ],
     },

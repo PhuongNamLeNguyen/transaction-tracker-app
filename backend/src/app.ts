@@ -9,7 +9,14 @@ import { errorMiddleware } from "./middleware/error.middleware";
 export const app = express();
 
 app.use(helmet({ crossOriginResourcePolicy: { policy: "cross-origin" } }));
-app.use(cors({ origin: process.env.CORS_ORIGIN, credentials: true }));
+app.use(cors({
+    origin: (origin, cb) => {
+        const allowed = (process.env.CORS_ORIGIN ?? "").split(",").map(o => o.trim()).filter(Boolean);
+        if (!origin || allowed.includes(origin)) return cb(null, true);
+        cb(new Error(`CORS: origin ${origin} not allowed`));
+    },
+    credentials: true,
+}));
 app.use(express.json());
 app.use(cookieParser());
 

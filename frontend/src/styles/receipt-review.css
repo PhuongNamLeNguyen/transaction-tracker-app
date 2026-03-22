@@ -199,9 +199,14 @@
     line-height: var(--leading-snug);
 }
 
-/* ── Inline editable input inside detail-row ── */
+/* ── Inline editable input + edit icon wrapper ── */
+.rxv-inline-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+    min-width: 0;
+}
 .rxv-inline-input {
-    flex: 1;
     background: none;
     border: none;
     outline: none;
@@ -210,6 +215,8 @@
     font-family: var(--font-sans);
     text-align: right;
     min-width: 0;
+    width: 0;
+    flex: 1;
 }
 .rxv-inline-input::placeholder { color: var(--color-text-tertiary); }
 
@@ -296,22 +303,65 @@
     font-size: var(--text-xs);
     font-weight: var(--weight-medium);
 }
-.rxv-cat-select {
-    flex: 1;
+/* ── Shared pill select (Loại + Danh mục) ── */
+.rxv-pill-select {
+    width: 100px;
     background: var(--color-surface-raised);
-    border: 1.5px solid var(--color-warning);
-    border-radius: var(--radius-lg);
-    padding: var(--space-1) var(--space-2);
+    border: 1.5px solid currentColor;
+    border-radius: var(--radius-full);
+    padding: var(--space-1) var(--space-3);
     font-size: var(--text-xs);
-    font-weight: var(--weight-medium);
-    color: var(--color-text-primary);
+    font-weight: var(--weight-semibold);
     font-family: var(--font-sans);
     outline: none;
     cursor: pointer;
     appearance: none;
     -webkit-appearance: none;
+    text-align: center;
+    text-align-last: center;
 }
-.rxv-cat-select:focus { border-color: var(--color-accent); }
+.rxv-pill-select--type {
+    background: color-mix(in srgb, currentColor 15%, transparent);
+}
+.rxv-pill-select:focus { opacity: 0.85; }
+
+/* ── Amount row ── */
+.rxv-amount-col {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 2px;
+}
+.rxv-amount-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+    justify-content: flex-end;
+}
+.rxv-conversion-hint {
+    font-size: 11px;
+    color: var(--color-text-tertiary);
+    text-align: right;
+}
+.rxv-amount-input {
+    background: none;
+    border: none;
+    outline: none;
+    font-size: 24px;
+    font-weight: var(--weight-bold);
+    color: var(--color-accent);
+    font-family: var(--font-sans);
+    text-align: right;
+    min-width: 0;
+    max-width: 200px;
+}
+.rxv-amount-input::placeholder { color: var(--color-text-tertiary); font-weight: var(--weight-normal); }
+.rxv-amount-currency {
+    font-size: 24px;
+    font-weight: var(--weight-bold);
+    color: var(--color-accent);
+    flex-shrink: 0;
+}
 
 /* ── Sticky confirm footer ── */
 .rxv-footer {

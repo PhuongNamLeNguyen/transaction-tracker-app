@@ -92,21 +92,22 @@ export interface DeletedSplitItem {
     categoryName: string;
     categoryIcon: string | null;
     deletedAt: string;
+    entityType?: "split" | "transaction";
 }
 
 /* ─── API ─── */
 export const transactionsApi = {
-    /** GET /transactions?year=&month=&type=&category_id= */
+    /** GET /transactions?year=&month=&type=&category_id= — year/month optional */
     async list(params: {
-        year: number;
-        month: number;
+        year?: number;
+        month?: number;
         type?: string;
         category_id?: string;
     }): Promise<TxListItem[]> {
         const qs = new URLSearchParams({
-            year: String(params.year),
-            month: String(params.month),
-            ...(params.type ? { type: params.type } : {}),
+            ...(params.year  != null ? { year:  String(params.year)  } : {}),
+            ...(params.month != null ? { month: String(params.month) } : {}),
+            ...(params.type        ? { type:        params.type        } : {}),
             ...(params.category_id ? { category_id: params.category_id } : {}),
         });
         const res = await fetch(`${BASE}/transactions?${qs}`, {
@@ -159,6 +160,16 @@ export const transactionsApi = {
         });
         if (!res.ok) throw await res.json();
         return (await res.json()).data;
+    },
+
+    /** DELETE /transactions/:id — soft-delete entire transaction */
+    async deleteTransaction(id: string): Promise<void> {
+        const res = await fetch(`${BASE}/transactions/${id}`, {
+            method: "DELETE",
+            headers: authHeaders(),
+            credentials: "include",
+        });
+        if (!res.ok) throw await res.json();
     },
 
     /** DELETE /transactions/:id/splits/:splitId — soft-delete */
@@ -222,6 +233,37 @@ export const transactionsApi = {
             credentials: "include",
         });
         if (!res.ok) throw await res.json();
-        return (await res.json()).data.splits;
+        const splits: DeletedSplitItem[] = (await res.json()).data.splits;
+        return splits.map((s) => ({ ...s, entityType: "split" as const }));
+    },
+
+    /** GET /transactions/deleted — soft-deleted transactions */
+    async getDeletedTransactions(): Promise<DeletedSplitItem[]> {
+        const res = await fetch(`${BASE}/transactions/deleted`, {
+            headers: authHeaders(),
+            credentials: "include",
+        });
+        if (!res.ok) throw await res.json();
+        return (await res.json()).data;
+    },
+
+    /** PATCH /transactions/:id/restore */
+    async restoreTransaction(id: string): Promise<void> {
+        const res = await fetch(`${BASE}/transactions/${id}/restore`, {
+            method: "PATCH",
+            headers: authHeaders(),
+            credentials: "include",
+        });
+        if (!res.ok) throw await res.json();
+    },
+
+    /** DELETE /transactions/:id/permanent */
+    async hardDeleteTransaction(id: string): Promise<void> {
+        const res = await fetch(`${BASE}/transactions/${id}/permanent`, {
+            method: "DELETE",
+            headers: authHeaders(),
+            credentials: "include",
+        });
+        if (!res.ok) throw await res.json();
     },
 };

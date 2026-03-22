@@ -5,6 +5,7 @@ import {
     type TransactionType,
     type TxCategory,
 } from "@/api/transactions.api";
+import { settingsApi } from "@/api/settings.api";
 import { Icon } from "@/components/common/Icon";
 import "@/styles/add-transaction.css";
 
@@ -46,6 +47,13 @@ export const AddTransactionPage = () => {
     const [saving, setSaving]                 = useState(false);
     const [error, setError]                   = useState<string | null>(null);
     const [success, setSuccess]               = useState(false);
+    const [accountCurrency, setAccountCurrency] = useState("VND");
+
+    useEffect(() => {
+        settingsApi.getSettings().then((s) => {
+            if (s.account?.currency) setAccountCurrency(s.account.currency);
+        }).catch(() => {});
+    }, []);
 
     /* Load categories whenever type changes */
     const loadCategories = useCallback(async (t: TransactionType) => {
@@ -66,7 +74,7 @@ export const AddTransactionPage = () => {
     const parsedAmount = parseInt(rawAmount || "0", 10);
     const isValid = parsedAmount > 0 && selectedCatId !== null;
     const cfg = TYPE_CONFIG[type];
-    const currency = "VND";
+    const currencyLabel = accountCurrency === "VND" ? "đ" : accountCurrency;
 
     async function handleSubmit(e: React.FormEvent) {
         e.preventDefault();
@@ -129,7 +137,7 @@ export const AddTransactionPage = () => {
                 {/* ── Amount ── */}
                 <div className="atx-field-group">
                     <label className="atx-label" htmlFor="atx-amount">
-                        Số tiền ({currency}) <span className="atx-req">*</span>
+                        Số tiền ({currencyLabel}) <span className="atx-req">*</span>
                     </label>
                     <div className="atx-field-row">
                         <input

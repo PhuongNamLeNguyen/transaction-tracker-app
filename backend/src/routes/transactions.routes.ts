@@ -8,6 +8,7 @@ transactionsRouter.use(authenticate, requireVerified);
 
 // Static paths first to avoid collision with /:id
 transactionsRouter.get("/categories", transactionsController.getCategories);
+transactionsRouter.get("/deleted", transactionsController.getDeletedTransactions);
 transactionsRouter.get("/splits/deleted", transactionsController.getDeletedSplits);
 transactionsRouter.delete("/splits/permanent", transactionsController.bulkHardDeleteSplits);
 transactionsRouter.patch("/splits/restore", transactionsController.bulkRestoreSplits);
@@ -15,6 +16,9 @@ transactionsRouter.patch("/splits/restore", transactionsController.bulkRestoreSp
 transactionsRouter.get("/", transactionsController.list);
 transactionsRouter.post("/", transactionsController.create);
 transactionsRouter.get("/:id", transactionsController.getById);
+transactionsRouter.delete("/:id", transactionsController.deleteTransaction);
+transactionsRouter.patch("/:id/restore", transactionsController.restoreTransaction);
+transactionsRouter.delete("/:id/permanent", transactionsController.hardDeleteTransaction);
 
 // Split-level actions (must be after /:id to get correct param names)
 transactionsRouter.delete("/:id/splits/:splitId", transactionsController.deleteSplit);

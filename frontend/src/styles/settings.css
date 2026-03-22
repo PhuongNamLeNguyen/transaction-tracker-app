@@ -52,6 +52,79 @@
     line-height: 1.3;
 }
 
+.settings-profile__info {
+    flex: 1;
+    min-width: 0;
+}
+
+.settings-profile__name-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+.settings-profile__name-input {
+    flex: 1;
+    font-size: var(--text-base);
+    font-weight: var(--weight-bold);
+    color: var(--color-text-primary);
+    background: var(--color-surface-raised);
+    border: 1.5px solid var(--color-accent);
+    border-radius: var(--radius-sm);
+    padding: 2px var(--space-2);
+    outline: none;
+    min-width: 0;
+    line-height: 1.3;
+}
+
+.settings-profile__name-actions {
+    display: flex;
+    gap: var(--space-1);
+    flex-shrink: 0;
+}
+
+.settings-profile__name-btn {
+    width: 26px;
+    height: 26px;
+    border-radius: var(--radius-full);
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.settings-profile__name-btn--confirm {
+    background: var(--color-accent);
+    color: var(--color-text-inverse);
+}
+
+.settings-profile__name-btn--confirm:disabled {
+    opacity: 0.5;
+}
+
+.settings-profile__name-btn--cancel {
+    background: var(--color-surface-raised);
+    color: var(--color-text-secondary);
+}
+
+.settings-profile__edit-btn {
+    background: none;
+    border: none;
+    color: var(--color-text-tertiary);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    padding: 2px;
+    flex-shrink: 0;
+    transition: color var(--duration-instant) var(--ease-standard);
+}
+
+.settings-profile__edit-btn:active {
+    color: var(--color-accent);
+}
+
 .settings-profile__email {
     font-size: var(--text-sm);
     color: var(--color-text-secondary);

@@ -1,7 +1,13 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { receiptsApi, type TransactionSuggestion, type SuggestionItem } from "@/api/receipts.api";
-import { transactionsApi, type TransactionType, type TxCategory } from "@/api/transactions.api";
+import { receiptsApi, type TransactionSuggestion } from "@/api/receipts.api";
+import {
+    transactionsApi,
+    type TransactionType,
+    type TxCategory,
+} from "@/api/transactions.api";
+import { settingsApi } from "@/api/settings.api";
+import { exchangeApi } from "@/api/exchange.api";
 import { Icon } from "@/components/common/Icon";
 import "@/styles/transactions.css"; // detail-row, detail-sheet__* classes
 import "@/styles/receipt-review.css";
@@ -9,45 +15,49 @@ import "@/styles/receipt-review.css";
 /* ─── Types ─── */
 type Phase = "preview" | "scanning" | "review";
 
+interface ConversionInfo {
+    original: number;
+    from: string;
+    rate: number;
+}
+
 interface LocationState {
     file: File;
     type: TransactionType;
 }
 
-interface ItemState extends SuggestionItem {
-    selectedCategoryId: string | null;
-    selectedCategoryName: string | null;
-}
-
 /* ─── Helpers ─── */
 const TYPE_CONFIG: Record<TransactionType, { label: string; color: string }> = {
-    income:     { label: "Thu nhập",  color: "var(--color-income)"     },
-    expense:    { label: "Chi tiêu",  color: "var(--color-expense)"    },
-    investment: { label: "Đầu tư",   color: "var(--color-investment)" },
-    saving:     { label: "Tiết kiệm", color: "var(--color-saving)"     },
+    income: { label: "Thu nhập", color: "var(--color-income)" },
+    expense: { label: "Chi tiêu", color: "var(--color-expense)" },
+    investment: { label: "Đầu tư", color: "var(--color-investment)" },
+    saving: { label: "Tiết kiệm", color: "var(--color-saving)" },
 };
 
-function formatAmount(n: number | null, currency?: string | null): string {
-    if (n == null) return "—";
-    const formatted = n.toLocaleString("vi-VN");
-    if (!currency) return formatted;
-    return currency === "VND" ? `${formatted} đ` : `${formatted} ${currency}`;
+const TX_TYPES: TransactionType[] = [
+    "income",
+    "expense",
+    "investment",
+    "saving",
+];
+
+/** Parse ISO datetime (or date-only) → datetime-local string (YYYY-MM-DDTHH:mm) */
+function isoToDateTimeLocal(iso: string | null): string {
+    if (!iso) {
+        const d = new Date();
+        const date = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+        const time = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+        return `${date}T${time}`;
+    }
+    if (iso.includes("T")) return iso.slice(0, 16);
+    return `${iso}T00:00`;
 }
 
-function todayIso(): string {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-
-function isoDateOnly(iso: string | null): string {
-    if (!iso) return todayIso();
-    return iso.slice(0, 10);
-}
-
-function formatDateDisplay(iso: string): string {
-    if (!iso) return "—";
-    const [y, m, d] = iso.split("-");
-    return `${d}/${m}/${y}`;
+function formatDateTimeDisplay(dtLocal: string): string {
+    if (!dtLocal) return "—";
+    const [datePart, timePart = "00:00"] = dtLocal.split("T");
+    const [y, m, d] = datePart.split("-");
+    return `${d}/${m}/${y} ${timePart.slice(0, 5)}`;
 }
 
 /* ─── Page ─── */
@@ -61,87 +71,142 @@ export const ReceiptReviewPage = () => {
     }, [state, navigate]);
 
     const file = state?.file ?? null;
-    const txType = state?.type ?? "expense";
-    const cfg = TYPE_CONFIG[txType];
+    const initType = state?.type ?? "expense";
 
-    const [phase, setPhase]         = useState<Phase>("preview");
-    const [imageUrl]                = useState<string>(() => (file ? URL.createObjectURL(file) : ""));
-    const [suggestion, setSuggestion] = useState<TransactionSuggestion | null>(null);
-    const [items, setItems]         = useState<ItemState[]>([]);
+    const [phase, setPhase] = useState<Phase>("preview");
+    const [imageUrl] = useState<string>(() =>
+        file ? URL.createObjectURL(file) : "",
+    );
+    const [suggestion, setSuggestion] = useState<TransactionSuggestion | null>(
+        null,
+    );
     const [categories, setCategories] = useState<TxCategory[]>([]);
-    const [date, setDate]           = useState(todayIso);
-    const [note, setNote]           = useState("");
+
+    // Editable fields
+    const [selectedType, setSelectedType] = useState<TransactionType>(initType);
+    const [amount, setAmount] = useState<string>("");
+    const [dateTime, setDateTime] = useState<string>(() =>
+        isoToDateTimeLocal(null),
+    );
+    const [note, setNote] = useState("");
+    const [merchant, setMerchant] = useState("");
+
+    const [selectedCategoryId, setSelectedCategoryId] = useState<string>("");
+
+    const [accountCurrency, setAccountCurrency] = useState("VND");
+    const [conversionInfo, setConversionInfo] = useState<ConversionInfo | null>(null);
+
     const [scanError, setScanError] = useState<string | null>(null);
-    const [saving, setSaving]       = useState(false);
+    const [saving, setSaving] = useState(false);
     const [saveError, setSaveError] = useState<string | null>(null);
     const [saveSuccess, setSaveSuccess] = useState(false);
 
-    const loadCategories = useCallback(async () => {
+    const loadCategories = useCallback(async (type: TransactionType) => {
         try {
-            const cats = await transactionsApi.getCategories(txType);
+            const cats = await transactionsApi.getCategories(type);
             setCategories(cats);
-        } catch { setCategories([]); }
-    }, [txType]);
+        } catch {
+            setCategories([]);
+        }
+    }, []);
 
-    useEffect(() => { loadCategories(); }, [loadCategories]);
+    useEffect(() => {
+        loadCategories(selectedType);
+    }, [loadCategories, selectedType]);
 
     async function handleScan() {
         if (!file) return;
         setPhase("scanning");
         setScanError(null);
         try {
-            const result = await receiptsApi.uploadAndScan(file, txType);
+            const [result, settingsData] = await Promise.all([
+                receiptsApi.uploadAndScan(file, selectedType),
+                settingsApi.getSettings(),
+            ]);
             const s = result.suggestion;
+            const userCur = (
+                settingsData.preferences?.targetCurrency ??
+                settingsData.account?.currency ??
+                "VND"
+            ).toUpperCase();
+            setAccountCurrency(userCur);
+
             setSuggestion(s);
-            setDate(isoDateOnly(s.transactionDate));
-            setNote(s.merchant?.name ?? "");
-            setItems(s.items.map((item) => ({
-                ...item,
-                selectedCategoryId:   item.prediction.categoryId,
-                selectedCategoryName: item.prediction.categoryName,
-            })));
+            setDateTime(isoToDateTimeLocal(s.transactionDate));
+            setMerchant(s.merchant?.name ?? "");
+            // Auto-generate note from items or merchant
+            const itemNames = s.items.map((i) => i.itemName).filter(Boolean);
+            const autoNote = itemNames.length > 0
+                ? `Mua ${itemNames.slice(0, 3).join(", ")}`
+                : s.merchant?.name ? `Mua tại ${s.merchant.name}` : "";
+            setNote(autoNote.slice(0, 20));
+            setSelectedCategoryId(s.items[0]?.prediction.categoryId ?? "");
+
+            // Currency conversion
+            const rawAmount = s.totalAmount;
+            const receiptCur = (s.currency ?? "").toUpperCase();
+            console.log("[ReceiptReview] currency detected:", s.currency, "| receiptCur:", receiptCur, "| userCur:", userCur, "| rawAmount:", rawAmount);
+
+            if (rawAmount != null && receiptCur && receiptCur !== userCur) {
+                try {
+                    const rate = await exchangeApi.getRate(receiptCur, userCur);
+                    console.log("[ReceiptReview] exchange rate", receiptCur, "→", userCur, "=", rate);
+                    if (rate !== null) {
+                        setAmount(String(Math.round(rawAmount * rate)));
+                        setConversionInfo({ original: rawAmount, from: receiptCur, rate });
+                    } else {
+                        setAmount(String(rawAmount));
+                        setConversionInfo(null);
+                    }
+                } catch (rateErr) {
+                    console.error("[ReceiptReview] exchange rate error:", rateErr);
+                    setAmount(String(rawAmount));
+                    setConversionInfo(null);
+                }
+            } else {
+                if (!receiptCur) console.warn("[ReceiptReview] AI returned null currency — skipping conversion");
+                setAmount(rawAmount != null ? String(rawAmount) : "");
+                setConversionInfo(null);
+            }
+
             setPhase("review");
         } catch (err: unknown) {
             const code = (err as { error?: { code?: string } })?.error?.code;
             const msg =
-                code === "AI_NOT_A_RECEIPT"  ? "Không tìm thấy thông tin giao dịch. Hãy thử ảnh khác hoặc nhập thủ công."
-              : code === "AI_IMAGE_TOO_BLURRY" ? "Ảnh quá mờ, không đọc được. Vui lòng chụp lại rõ hơn."
-              : code === "AI_LIMIT_REACHED"    ? "Dịch vụ quét hóa đơn tạm thời không khả dụng. Vui lòng nhập thủ công."
-              : code === "THIRD_PARTY_ERROR"   ? "Không thể kết nối dịch vụ AI. Vui lòng thử lại sau."
-              : "Không thể đọc hóa đơn. Vui lòng thử lại hoặc nhập thủ công.";
+                code === "AI_NOT_A_RECEIPT"
+                    ? "Không tìm thấy thông tin giao dịch. Hãy thử ảnh khác hoặc nhập thủ công."
+                    : code === "AI_IMAGE_TOO_BLURRY"
+                      ? "Ảnh quá mờ, không đọc được. Vui lòng chụp lại rõ hơn."
+                      : code === "AI_LIMIT_REACHED"
+                        ? "Dịch vụ quét hóa đơn tạm thời không khả dụng. Vui lòng nhập thủ công."
+                        : code === "THIRD_PARTY_ERROR"
+                          ? "Không thể kết nối dịch vụ AI. Vui lòng thử lại sau."
+                          : "Không thể đọc hóa đơn. Vui lòng thử lại hoặc nhập thủ công.";
             setScanError(msg);
             setPhase("preview");
         }
     }
 
-    function handleCategoryChange(idx: number, catId: string) {
-        const cat = categories.find((c) => c.id === catId) ?? null;
-        setItems((prev) => prev.map((item, i) =>
-            i === idx
-                ? { ...item, selectedCategoryId: catId || null, selectedCategoryName: cat?.name ?? null }
-                : item,
-        ));
-    }
-
-    const allCategoriesSet = items.length === 0 || items.every((i) => i.selectedCategoryId !== null);
-    const hasLowConfidence = items.some((i) => i.prediction.lowConfidence);
+    const allCategoriesSet = !!selectedCategoryId;
+    const cfg = TYPE_CONFIG[selectedType];
 
     async function handleConfirm() {
-        if (!suggestion || !allCategoriesSet || saving) return;
-        const splitMap: Record<string, number> = {};
-        for (const item of items) {
-            const catId = item.selectedCategoryId!;
-            splitMap[catId] = (splitMap[catId] ?? 0) + item.subtotal;
-        }
-        const splits = Object.entries(splitMap).map(([categoryId, amount]) => ({ categoryId, amount }));
-        if (splits.length === 0) return;
+        if (!suggestion || !selectedCategoryId || saving) return;
+        const parsedAmount = parseFloat(amount);
+        if (isNaN(parsedAmount) || parsedAmount <= 0) return;
+        const splits = [
+            {
+                categoryId: selectedCategoryId,
+                amount: Math.round(parsedAmount),
+            },
+        ];
 
         setSaving(true);
         setSaveError(null);
         try {
             await transactionsApi.createFromReceipt({
-                type: txType,
-                transactionDate: date,
+                type: selectedType,
+                transactionDate: dateTime.slice(0, 10),
                 receiptId: suggestion.receiptId!,
                 note: note.trim() || undefined,
                 items: splits,
@@ -181,15 +246,28 @@ export const ReceiptReviewPage = () => {
                 </header>
 
                 <div className="rxv-preview-body">
-                    <span className="rxv-type-badge" style={{ background: cfg.color }}>
+                    <span
+                        className="rxv-type-badge"
+                        style={{ background: cfg.color }}
+                    >
                         {cfg.label}
                     </span>
 
-                    <div className={`rxv-preview-wrap${scanning ? " rxv-preview-wrap--scanning" : ""}`}>
-                        <img src={imageUrl} alt="Hóa đơn" className="rxv-preview-img" />
+                    <div
+                        className={`rxv-preview-wrap${scanning ? " rxv-preview-wrap--scanning" : ""}`}
+                    >
+                        <img
+                            src={imageUrl}
+                            alt="Hóa đơn"
+                            className="rxv-preview-img"
+                        />
                         {scanning && (
                             <div className="rxv-scan-overlay">
-                                <Icon name="progress_activity" size={44} className="spin-icon" />
+                                <Icon
+                                    name="progress_activity"
+                                    size={44}
+                                    className="spin-icon"
+                                />
                                 <p>Đang phân tích hóa đơn...</p>
                             </div>
                         )}
@@ -205,7 +283,11 @@ export const ReceiptReviewPage = () => {
 
                 {!scanning && (
                     <div className="rxv-preview-footer">
-                        <button className="rxv-btn rxv-btn--ghost" onClick={() => navigate(-1)} type="button">
+                        <button
+                            className="rxv-btn rxv-btn--ghost"
+                            onClick={() => navigate(-1)}
+                            type="button"
+                        >
                             <Icon name="arrow_back" size={18} />
                             Chọn ảnh khác
                         </button>
@@ -216,7 +298,7 @@ export const ReceiptReviewPage = () => {
                             type="button"
                         >
                             Đọc hóa đơn
-                            <Icon name="chevron_right" size={18} />
+                            <Icon name="arrow_forward" size={18} />
                         </button>
                     </div>
                 )}
@@ -225,17 +307,17 @@ export const ReceiptReviewPage = () => {
     }
 
     /* ══════════════════════════════════════════
-       Phase: review — styled like "Thông tin giao dịch"
+       Phase: review
     ══════════════════════════════════════════ */
-    const s = suggestion!;
-
     return (
         <div className="rxv-page">
-            {/* Header — same topbar style as detail sheet */}
             <div className="detail-sheet__topbar rxv-topbar">
                 <button
                     className="detail-sheet__close rxv-back-btn"
-                    onClick={() => { setPhase("preview"); setScanError(null); }}
+                    onClick={() => {
+                        setPhase("preview");
+                        setScanError(null);
+                    }}
                     aria-label="Quay lại"
                     type="button"
                     disabled={saving}
@@ -246,121 +328,129 @@ export const ReceiptReviewPage = () => {
                 <div style={{ width: 28 }} />
             </div>
 
-            {/* Scrollable body */}
             <div className="detail-sheet__body rxv-review-body">
-
-                {/* Low-confidence warning banner */}
-                {hasLowConfidence && (
-                    <div className="rxv-warning-banner">
-                        <Icon name="warning" size={16} />
-                        Một số mục chưa xác định được danh mục. Vui lòng chọn danh mục cho các mục được đánh dấu.
-                    </div>
-                )}
-
-                {/* ── Nội dung (Note) ── */}
-                <div className="detail-row">
-                    <span className="detail-row__label">Nội dung</span>
-                    <input
-                        className="rxv-inline-input"
-                        value={note}
-                        onChange={(e) => setNote(e.target.value)}
-                        placeholder="Giao dịch"
-                        maxLength={500}
-                    />
-                </div>
-
-                {/* ── Loại giao dịch ── */}
+                {/* ── Loại giao dịch — dropdown ── */}
                 <div className="detail-row">
                     <span className="detail-row__label">Loại</span>
-                    <span className="rxv-type-badge rxv-type-badge--sm" style={{ background: cfg.color }}>
-                        {cfg.label}
-                    </span>
+                    <select
+                        className="rxv-pill-select rxv-pill-select--type"
+                        value={selectedType}
+                        onChange={(e) =>
+                            setSelectedType(e.target.value as TransactionType)
+                        }
+                        style={{ color: cfg.color }}
+                    >
+                        {TX_TYPES.map((t) => (
+                            <option key={t} value={t}>
+                                {TYPE_CONFIG[t].label}
+                            </option>
+                        ))}
+                    </select>
                 </div>
 
-                {/* ── Số tiền ── */}
+                {/* ── Danh mục ── */}
+                <div className="detail-row">
+                    <span className="detail-row__label">Danh mục</span>
+                    <select
+                        className="rxv-pill-select"
+                        value={selectedCategoryId}
+                        onChange={(e) => setSelectedCategoryId(e.target.value)}
+                        style={{ color: "var(--color-text-secondary)" }}
+                    >
+                        <option value="">Chọn danh mục</option>
+                        {categories.map((c) => (
+                            <option key={c.id} value={c.id}>
+                                {c.name}
+                            </option>
+                        ))}
+                    </select>
+                </div>
+
+                {/* ── Số tiền — editable ── */}
                 <div className="detail-row">
                     <span className="detail-row__label">Số tiền</span>
-                    <span className="detail-row__value detail-row__value--amount">
-                        {formatAmount(s.totalAmount, s.currency)}
-                    </span>
+                    <div className="rxv-amount-col">
+                        <div className="rxv-amount-row">
+                            <input
+                                className="rxv-amount-input"
+                                type="tel"
+                                inputMode="numeric"
+                                value={amount ? Number(amount).toLocaleString("vi-VN") : ""}
+                                onChange={(e) => {
+                                    setAmount(e.target.value.replace(/\D/g, ""));
+                                    setConversionInfo(null);
+                                }}
+                                placeholder="—"
+                            />
+                            <span className="rxv-amount-currency">
+                                {accountCurrency === "VND" ? "đ" : accountCurrency}
+                            </span>
+                        </div>
+                        {conversionInfo && (
+                            <span className="rxv-conversion-hint">
+                                Tỉ giá: 1 {conversionInfo.from} = {conversionInfo.rate.toLocaleString("vi-VN")} {accountCurrency === "VND" ? "đ" : accountCurrency}
+                            </span>
+                        )}
+                    </div>
                 </div>
 
-                {/* ── Ngày giao dịch ── */}
+                {/* ── Ngày giờ — datetime-local ── */}
                 <div className="detail-row">
                     <span className="detail-row__label">Ngày giờ</span>
                     <div className="rxv-date-row">
-                        <span className="detail-row__value">{formatDateDisplay(date)}</span>
+                        <span className="detail-row__value">
+                            {formatDateTimeDisplay(dateTime)}
+                        </span>
                         <input
-                            type="date"
+                            type="datetime-local"
                             className="rxv-date-hidden"
-                            value={date}
-                            onChange={(e) => setDate(e.target.value)}
-                            max={todayIso()}
-                            aria-label="Chọn ngày"
+                            value={dateTime}
+                            onChange={(e) => setDateTime(e.target.value)}
+                            aria-label="Chọn ngày giờ"
+                        />
+                        <Icon
+                            name="edit"
+                            size={14}
+                            className="rxv-date-edit-icon"
+                        />
+                    </div>
+                </div>
+
+                {/* ── Nội dung (Note) — editable ── */}
+                <div className="detail-row">
+                    <span className="detail-row__label">Nội dung</span>
+                    <div className="rxv-inline-row">
+                        <input
+                            className="rxv-inline-input"
+                            value={note}
+                            onChange={(e) => setNote(e.target.value)}
+                            placeholder="Nhập nội dung..."
+                            maxLength={500}
                         />
                         <Icon name="edit" size={14} className="rxv-date-edit-icon" />
                     </div>
                 </div>
 
-                {/* ── Cửa hàng (nếu có) ── */}
-                {s.merchant && (
-                    <div className="detail-row">
-                        <span className="detail-row__label">Cửa hàng</span>
-                        <span className="detail-row__value">{s.merchant.name}</span>
+                {/* ── Cửa hàng — editable ── */}
+                <div className="detail-row">
+                    <span className="detail-row__label">Cửa hàng</span>
+                    <div className="rxv-inline-row">
+                        <input
+                            className="rxv-inline-input"
+                            value={merchant}
+                            onChange={(e) => setMerchant(e.target.value)}
+                            placeholder="—"
+                            maxLength={200}
+                        />
+                        <Icon name="edit" size={14} className="rxv-date-edit-icon" />
                     </div>
-                )}
-
-                {/* ── Danh mục / Items ── */}
-                {items.length > 0 && (
-                    <div className="detail-row rxv-items-row">
-                        <span className="detail-row__label">Danh mục</span>
-                        <div className="rxv-items-col">
-                            {items.map((item, idx) => (
-                                <div
-                                    key={item.receiptItemId ?? idx}
-                                    className={`rxv-item-entry${item.prediction.lowConfidence ? " rxv-item-entry--low" : ""}`}
-                                >
-                                    {/* Item name + amount */}
-                                    <div className="rxv-item-entry__top">
-                                        <span className="rxv-item-entry__name">
-                                            {item.itemName}
-                                            {item.quantity > 1 && (
-                                                <span className="rxv-item-entry__qty"> ×{item.quantity}</span>
-                                            )}
-                                        </span>
-                                        <span className="rxv-item-entry__amount">
-                                            {formatAmount(item.subtotal, s.currency)}
-                                        </span>
-                                    </div>
-                                    {/* Category — chip or dropdown */}
-                                    {item.prediction.lowConfidence ? (
-                                        <select
-                                            className="rxv-cat-select"
-                                            value={item.selectedCategoryId ?? ""}
-                                            onChange={(e) => handleCategoryChange(idx, e.target.value)}
-                                        >
-                                            <option value="">Chọn danh mục *</option>
-                                            {categories.map((c) => (
-                                                <option key={c.id} value={c.id}>{c.name}</option>
-                                            ))}
-                                        </select>
-                                    ) : (
-                                        <span className="rxv-cat-chip">
-                                            {item.selectedCategoryName ?? item.prediction.categoryName ?? "—"}
-                                        </span>
-                                    )}
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                )}
+                </div>
 
                 {/* ── Ảnh hóa đơn ── */}
                 <div className="detail-sheet__receipt">
                     <img src={imageUrl} alt="Hóa đơn" />
                 </div>
 
-                {/* ── Error ── */}
                 {saveError && (
                     <div className="rxv-error-box rxv-error-box--inline">
                         <Icon name="error_outline" size={16} />
@@ -373,15 +463,30 @@ export const ReceiptReviewPage = () => {
             <div className="rxv-footer">
                 <button
                     className="rxv-confirm-btn"
-                    style={{ background: allCategoriesSet && !saveSuccess ? cfg.color : undefined }}
+                    style={{
+                        background:
+                            allCategoriesSet && !saveSuccess
+                                ? cfg.color
+                                : undefined,
+                    }}
                     disabled={!allCategoriesSet || saving || saveSuccess}
                     onClick={handleConfirm}
                     type="button"
                 >
                     {saving ? (
-                        <><Icon name="progress_activity" size={18} className="spin-icon" />Đang lưu...</>
+                        <>
+                            <Icon
+                                name="progress_activity"
+                                size={18}
+                                className="spin-icon"
+                            />
+                            Đang lưu...
+                        </>
                     ) : saveSuccess ? (
-                        <><Icon name="check_circle" size={18} />Đã lưu!</>
+                        <>
+                            <Icon name="check_circle" size={18} />
+                            Đã lưu!
+                        </>
                     ) : (
                         "Xác nhận & Lưu"
                     )}

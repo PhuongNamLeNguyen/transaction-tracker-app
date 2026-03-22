@@ -40,11 +40,11 @@ export interface CategoryBreakdown {
     saving: CategoryBreakdownItem[];
 }
 
-export interface BudgetProgressItem {
+export interface PlanProgressItem {
     categoryId: string;
     name: string;
     icon: string;
-    budgetAmount: number;
+    planAmount: number;
     actualAmount: number;
     utilisationPct: number;
     currency: string;
@@ -69,7 +69,7 @@ export interface DashboardResponse {
     period: DashboardPeriod | null;
     summary: DashboardSummary;
     categoryBreakdown: CategoryBreakdown;
-    budgetProgress: BudgetProgressItem[];
+    planProgress: PlanProgressItem[];
     transactions: DashboardTransaction[];
 }
 

@@ -197,10 +197,10 @@ export const BottomNav = () => {
 
                 {/* Kế hoạch */}
                 <button
-                    className={`bottom-nav__item${isActive("/budgets") ? " bottom-nav__item--active" : ""}`}
-                    onClick={() => navigate("/budgets")}
+                    className={`bottom-nav__item${isActive("/plans") ? " bottom-nav__item--active" : ""}`}
+                    onClick={() => navigate("/plans")}
                 >
-                    <Icon name="account_balance_wallet" size={22} filled={isActive("/budgets")} />
+                    <Icon name="account_balance_wallet" size={22} filled={isActive("/plans")} />
                     Kế hoạch
                 </button>
 

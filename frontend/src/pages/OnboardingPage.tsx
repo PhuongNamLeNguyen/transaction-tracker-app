@@ -24,9 +24,10 @@ const TOTAL_STEPS = 4;
 
 /* ─── Types ─────────────────────────────────────────────────── */
 
-interface BudgetItem {
+interface PlanItem {
     categoryId: string;
     name: string;
+    icon: string | null;
     amount: number; // 0 = chưa nhập
 }
 
@@ -136,7 +137,7 @@ const Step2 = ({ value, onChange, faqOpen, onToggleFaq }: Step2Props) => (
 );
 
 interface Step3Props {
-    items: BudgetItem[];
+    items: PlanItem[];
     onUpdateAmount: (categoryId: string, raw: string) => void;
     onRemove: (categoryId: string) => void;
     onAddClick: () => void;
@@ -157,7 +158,10 @@ const Step3 = ({ items, onUpdateAmount, onRemove, onAddClick, error }: Step3Prop
             <div className="ob-table-body">
                 {items.map((item) => (
                     <div key={item.categoryId} className="ob-table-row">
-                        <span className="ob-table-name">{item.name}</span>
+                        <span className="ob-table-name">
+                            {item.icon && <Icon name={item.icon} size={16} />}
+                            {item.name}
+                        </span>
                         <input
                             className="ob-amount-input"
                             type="text"
@@ -197,7 +201,7 @@ const Step3 = ({ items, onUpdateAmount, onRemove, onAddClick, error }: Step3Prop
 interface Step4Props {
     cycleStartDay: number;
     targetCurrency: string;
-    items: BudgetItem[];
+    items: PlanItem[];
 }
 const Step4 = ({ cycleStartDay, targetCurrency, items }: Step4Props) => {
     const currencyName =
@@ -257,7 +261,7 @@ export const OnboardingPage = () => {
 
     /* Step 3 */
     const [categories, setCategories] = useState<Category[]>([]);
-    const [budgetItems, setBudgetItems] = useState<BudgetItem[]>([]);
+    const [planItems, setPlanItems] = useState<PlanItem[]>([]);
     const [showPicker, setShowPicker] = useState(false);
     const [step3Error, setStep3Error] = useState<string | null>(null);
 
@@ -272,10 +276,11 @@ export const OnboardingPage = () => {
             .then((cats) => {
                 setCategories(cats);
                 // Pre-select first 4 categories
-                setBudgetItems(
+                setPlanItems(
                     cats.slice(0, 4).map((c) => ({
                         categoryId: c.id,
                         name: c.name,
+                        icon: c.icon,
                         amount: 0,
                     })),
                 );
@@ -288,12 +293,12 @@ export const OnboardingPage = () => {
     /* ─── Budget helpers ─────────────────────────────────────── */
 
     const availableCategories = categories.filter(
-        (c) => !budgetItems.find((b) => b.categoryId === c.id),
+        (c) => !planItems.find((b) => b.categoryId === c.id),
     );
 
     const updateAmount = (categoryId: string, raw: string) => {
         const amount = parseRaw(raw);
-        setBudgetItems((prev) =>
+        setPlanItems((prev) =>
             prev.map((b) =>
                 b.categoryId === categoryId ? { ...b, amount } : b,
             ),
@@ -301,13 +306,13 @@ export const OnboardingPage = () => {
     };
 
     const removeItem = (categoryId: string) => {
-        setBudgetItems((prev) => prev.filter((b) => b.categoryId !== categoryId));
+        setPlanItems((prev) => prev.filter((b) => b.categoryId !== categoryId));
     };
 
     const addCategory = (cat: Category) => {
-        setBudgetItems((prev) => [
+        setPlanItems((prev) => [
             ...prev,
-            { categoryId: cat.id, name: cat.name, amount: 0 },
+            { categoryId: cat.id, name: cat.name, icon: cat.icon, amount: 0 },
         ]);
         setShowPicker(false);
     };
@@ -316,11 +321,11 @@ export const OnboardingPage = () => {
 
     const goNext = () => {
         if (step === 3) {
-            if (budgetItems.length === 0) {
+            if (planItems.length === 0) {
                 setStep3Error("Vui lòng thêm ít nhất một khoản chi tiêu.");
                 return;
             }
-            const hasBlank = budgetItems.some((b) => b.amount <= 0);
+            const hasBlank = planItems.some((b) => b.amount <= 0);
             if (hasBlank) {
                 setStep3Error("Vui lòng nhập số tiền cho tất cả các khoản.");
                 return;
@@ -344,7 +349,7 @@ export const OnboardingPage = () => {
             await onboardingApi.setup({
                 cycleStartDay,
                 targetCurrency,
-                budgets: budgetItems.map((b) => ({
+                budgets: planItems.map((b) => ({
                     categoryId: b.categoryId,
                     amount: b.amount,
                 })),
@@ -401,7 +406,7 @@ export const OnboardingPage = () => {
                 )}
                 {step === 3 && (
                     <Step3
-                        items={budgetItems}
+                        items={planItems}
                         onUpdateAmount={updateAmount}
                         onRemove={removeItem}
                         onAddClick={() => setShowPicker(true)}
@@ -412,7 +417,7 @@ export const OnboardingPage = () => {
                     <Step4
                         cycleStartDay={cycleStartDay}
                         targetCurrency={targetCurrency}
-                        items={budgetItems}
+                        items={planItems}
                     />
                 )}
             </div>

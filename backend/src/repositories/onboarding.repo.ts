@@ -21,9 +21,9 @@ export const onboardingRepo = {
     /* ─── Categories ─── */
     getExpenseCategories: async () => {
         const result = await query(
-            `SELECT id, name FROM categories WHERE type = 'expense' ORDER BY name ASC`,
+            `SELECT id, name, icon FROM categories WHERE type = 'expense' ORDER BY name ASC`,
         );
-        return result.rows as Array<{ id: string; name: string }>;
+        return result.rows as Array<{ id: string; name: string; icon: string | null }>;
     },
 
     verifyCategoryIds: async (ids: string[]): Promise<string[]> => {
@@ -47,6 +47,21 @@ export const onboardingRepo = {
                  updated_at      = now()
              WHERE user_id = $1`,
             [userId, cycleStartDay, targetCurrency],
+        );
+    },
+
+    deleteExistingPeriods: async (userId: string) => {
+        // Delete budgets first (FK constraint), then periods
+        await query(
+            `DELETE FROM budgets
+             WHERE period_id IN (
+                 SELECT id FROM budget_periods WHERE user_id = $1
+             )`,
+            [userId],
+        );
+        await query(
+            `DELETE FROM budget_periods WHERE user_id = $1`,
+            [userId],
         );
     },
 

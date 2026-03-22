@@ -8,13 +8,13 @@ const authHeaders = () => ({
     Authorization: `Bearer ${getToken()}`,
 });
 
-export interface BudgetPeriod {
+export interface PlanPeriod {
     id: string;
     startDate: string;
     endDate: string;
 }
 
-export interface BudgetSummary {
+export interface PlanSummary {
     income: number;
     expense: number;
     investment: number;
@@ -22,24 +22,24 @@ export interface BudgetSummary {
     currency: string;
 }
 
-export interface BudgetProgressItem {
+export interface PlanProgressItem {
     categoryId: string;
     name: string;
     icon: string;
-    budgetAmount: number;
+    planAmount: number;
     actualAmount: number;
     utilisationPct: number;
     currency: string;
 }
 
-export interface BudgetResponse {
-    period: BudgetPeriod | null;
-    summary: BudgetSummary;
-    budgetProgress: BudgetProgressItem[];
+export interface PlanResponse {
+    period: PlanPeriod | null;
+    summary: PlanSummary;
+    planProgress: PlanProgressItem[];
 }
 
-export const budgetApi = {
-    async getBudget(): Promise<BudgetResponse> {
+export const planApi = {
+    async getPlan(): Promise<PlanResponse> {
         const res = await fetch(`${BASE}/budget`, {
             headers: authHeaders(),
             credentials: "include",

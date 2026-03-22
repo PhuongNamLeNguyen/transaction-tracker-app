@@ -14,7 +14,7 @@ export const budgetController = {
             return sendSuccess(res, {
                 period:         null,
                 summary:        { income: 0, expense: 0, investment: 0, saving: 0, currency: "VND" },
-                budgetProgress: [],
+                planProgress: [],
             });
         }
 
@@ -29,11 +29,11 @@ export const budgetController = {
             if (key in summary) (summary as unknown as Record<string, number>)[key] = Number(row.total);
         }
 
-        const budgetProgress = budgetRows.map((row) => ({
+        const planProgress = budgetRows.map((row) => ({
             categoryId:    row.category_id,
             name:          row.category_name,
             icon:          row.category_icon,
-            budgetAmount:  Number(row.budget_amount),
+            planAmount:    Number(row.budget_amount),
             actualAmount:  Number(row.actual_amount),
             utilisationPct: row.budget_amount > 0
                 ? Math.round((Number(row.actual_amount) / Number(row.budget_amount)) * 1000) / 10
@@ -51,7 +51,7 @@ export const budgetController = {
                 endDate:   period.end_date,
             },
             summary,
-            budgetProgress,
+            planProgress,
         });
     }),
 };

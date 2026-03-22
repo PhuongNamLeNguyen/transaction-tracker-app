@@ -77,7 +77,7 @@
     position: relative;
     overflow: hidden;
     border-radius: var(--radius-lg);
-    touch-action: none;
+    touch-action: pan-y; /* allow vertical scroll; JS intercepts horizontal only after confirmed */
     user-select: none;
     background: var(--color-surface);
     box-shadow: var(--shadow-xs);

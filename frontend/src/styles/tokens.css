@@ -53,12 +53,12 @@
     --color-saving-bg: #dbeafe;
 
     /* ─── Budget States ─── */
-    --color-budget-safe: var(--palette-orange-600);
-    --color-budget-warning: var(--palette-amber-500);
-    --color-budget-warning-bg: var(--palette-amber-100);
-    --color-budget-exceeded: var(--palette-red-500);
-    --color-budget-exceeded-bg: var(--palette-red-100);
-    --color-budget-bar-track: var(--palette-orange-100);
+    --color-plan-safe: var(--palette-orange-600);
+    --color-plan-warning: var(--palette-amber-500);
+    --color-plan-warning-bg: var(--palette-amber-100);
+    --color-plan-exceeded: var(--palette-red-500);
+    --color-plan-exceeded-bg: var(--palette-red-100);
+    --color-plan-bar-track: var(--palette-orange-100);
 
     /* ─── Semantic / Feedback ─── */
     --color-success: var(--palette-green-500);
@@ -78,6 +78,9 @@
     --color-destructive-hover: var(--palette-red-700);
     --color-focus-ring: var(--palette-orange-700);
     --color-scan-fab: var(--palette-orange-600);
+
+    /* ─── Icon ─── */
+    --icon-grad: 0;
 
     /* ─── Spacing (8pt grid) ─── */
     --space-1: 4px;
@@ -193,9 +196,9 @@
     --color-investment-bg: #2e1065;
     --color-saving-bg: #1e3a8a;
 
-    --color-budget-safe: var(--palette-orange-400);
-    --color-budget-exceeded: var(--palette-red-700);
-    --color-budget-bar-track: rgba(255, 255, 255, 0.08);
+    --color-plan-safe: var(--palette-orange-400);
+    --color-plan-exceeded: var(--palette-red-700);
+    --color-plan-bar-track: rgba(255, 255, 255, 0.08);
 
     --color-error: var(--palette-red-700);
     --color-info-bg: #1e3a8a;
@@ -205,6 +208,8 @@
     --color-accent-bg: var(--palette-orange-200);
     --color-focus-ring: var(--palette-orange-400);
     --color-scan-fab: var(--palette-orange-500);
+
+    --icon-grad: 200;
 
     --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3), 0 1px 2px rgba(0, 0, 0, 0.2);
     --shadow-card: 0 2px 8px rgba(0, 0, 0, 0.32), 0 1px 3px rgba(0, 0, 0, 0.2);

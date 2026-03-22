@@ -55,4 +55,14 @@ export const settingsApi = {
         });
         if (!res.ok) throw await res.json();
     },
+
+    async updateName(name: string): Promise<void> {
+        const res = await fetch(`${BASE}/settings`, {
+            method: "PATCH",
+            headers: authHeaders(),
+            credentials: "include",
+            body: JSON.stringify({ name }),
+        });
+        if (!res.ok) throw await res.json();
+    },
 };

@@ -26,10 +26,10 @@ function formatDeletedAt(isoStr: string): string {
 }
 
 const TYPE_COLORS: Record<string, string> = {
-    income:     "var(--color-income)",
-    expense:    "var(--color-expense)",
+    income: "var(--color-income)",
+    expense: "var(--color-expense)",
     investment: "var(--color-investment)",
-    saving:     "var(--color-saving)",
+    saving: "var(--color-saving)",
 };
 
 /* ─── Confirm dialog ─── */
@@ -37,10 +37,17 @@ function ConfirmDialog({
     count,
     onConfirm,
     onCancel,
-}: { count: number; onConfirm: () => void; onCancel: () => void }) {
+}: {
+    count: number;
+    onConfirm: () => void;
+    onCancel: () => void;
+}) {
     return (
         <div className="dlt-confirm-overlay" onClick={onCancel}>
-            <div className="dlt-confirm-dialog" onClick={(e) => e.stopPropagation()}>
+            <div
+                className="dlt-confirm-dialog"
+                onClick={(e) => e.stopPropagation()}
+            >
                 <div className="dlt-confirm-dialog__title">Xoá vĩnh viễn?</div>
                 <div className="dlt-confirm-dialog__text">
                     {count === 1
@@ -48,10 +55,16 @@ function ConfirmDialog({
                         : `${count} mục sẽ bị xoá vĩnh viễn và không thể khôi phục.`}
                 </div>
                 <div className="dlt-confirm-dialog__actions">
-                    <button className="dlt-confirm-btn dlt-confirm-btn--destructive" onClick={onConfirm}>
+                    <button
+                        className="dlt-confirm-btn dlt-confirm-btn--destructive"
+                        onClick={onConfirm}
+                    >
                         Xoá vĩnh viễn
                     </button>
-                    <button className="dlt-confirm-btn dlt-confirm-btn--cancel" onClick={onCancel}>
+                    <button
+                        className="dlt-confirm-btn dlt-confirm-btn--cancel"
+                        onClick={onCancel}
+                    >
                         Huỷ
                     </button>
                 </div>
@@ -80,41 +93,71 @@ function SwipeDeletedRow({
     onPermanentDelete: (item: DeletedSplitItem) => void;
 }) {
     const [offsetX, setOffsetX] = useState(0);
-    const [active,  setActive]  = useState(false);
+    const [active, setActive] = useState(false);
 
-    const onRestoreRef          = useRef(onRestore);
-    const onPermanentDeleteRef  = useRef(onPermanentDelete);
-    const selectModeRef         = useRef(selectMode);
-    const startX                = useRef(0);
-    const startY                = useRef(0);
-    const isHoriz               = useRef<boolean | null>(null);
-    const latestOffset          = useRef(0);
-    const rowRef                = useRef<HTMLDivElement>(null);
-    const contentRef            = useRef<HTMLDivElement>(null);
+    const onRestoreRef = useRef(onRestore);
+    const onPermanentDeleteRef = useRef(onPermanentDelete);
+    const selectModeRef = useRef(selectMode);
+    const startX = useRef(0);
+    const startY = useRef(0);
+    const isHoriz = useRef<boolean | null>(null);
+    const latestOffset = useRef(0);
+    const scrollLockRef = useRef<HTMLElement | null>(null);
+    const rowRef = useRef<HTMLDivElement>(null);
+    const contentRef = useRef<HTMLDivElement>(null);
 
-    useEffect(() => { onRestoreRef.current         = onRestore; },         [onRestore]);
-    useEffect(() => { onPermanentDeleteRef.current  = onPermanentDelete; }, [onPermanentDelete]);
-    useEffect(() => { selectModeRef.current         = selectMode; },        [selectMode]);
-    useEffect(() => { latestOffset.current          = offsetX; },           [offsetX]);
+    useEffect(() => {
+        onRestoreRef.current = onRestore;
+    }, [onRestore]);
+    useEffect(() => {
+        onPermanentDeleteRef.current = onPermanentDelete;
+    }, [onPermanentDelete]);
+    useEffect(() => {
+        selectModeRef.current = selectMode;
+    }, [selectMode]);
+    useEffect(() => {
+        latestOffset.current = offsetX;
+    }, [offsetX]);
 
     useEffect(() => {
         const el = contentRef.current;
         if (!el) return;
 
+        function lockScroll() {
+            if (scrollLockRef.current) return;
+            let ancestor: HTMLElement | null = el!.parentElement;
+            while (ancestor && ancestor !== document.documentElement) {
+                const ov = getComputedStyle(ancestor).overflowY;
+                if (ov === "auto" || ov === "scroll") {
+                    ancestor.style.overflowY = "hidden";
+                    scrollLockRef.current = ancestor;
+                    return;
+                }
+                ancestor = ancestor.parentElement;
+            }
+        }
+
+        function unlockScroll() {
+            if (scrollLockRef.current) {
+                scrollLockRef.current.style.overflowY = "";
+                scrollLockRef.current = null;
+            }
+        }
+
         function onTouchStart(e: TouchEvent) {
             if (selectModeRef.current) return;
             const t = e.touches[0];
-            startX.current  = t.clientX;
-            startY.current  = t.clientY;
+            startX.current = t.clientX;
+            startY.current = t.clientY;
             isHoriz.current = null;
             setActive(true);
         }
 
         function onTouchMove(e: TouchEvent) {
             if (selectModeRef.current) return;
-            const t   = e.touches[0];
-            const dx  = t.clientX - startX.current;
-            const dy  = t.clientY - startY.current;
+            const t = e.touches[0];
+            const dx = t.clientX - startX.current;
+            const dy = t.clientY - startY.current;
             const adx = Math.abs(dx);
             const ady = Math.abs(dy);
 
@@ -122,20 +165,25 @@ function SwipeDeletedRow({
                 if (adx < 3 && ady < 3) return;
                 isHoriz.current = adx > ady;
             }
-            if (!isHoriz.current) return;
+            if (!isHoriz.current) return; // vertical — let scroll happen naturally
 
             e.preventDefault();
-            const next = Math.max(-ACTION_WIDTH * 1.4, Math.min(ACTION_WIDTH * 1.4, dx));
+            lockScroll();
+            const next = Math.max(
+                -ACTION_WIDTH * 1.4,
+                Math.min(ACTION_WIDTH * 1.4, dx),
+            );
             latestOffset.current = next;
             setOffsetX(next);
         }
 
         function onTouchEnd() {
+            unlockScroll();
             setActive(false);
             if (selectModeRef.current || !isHoriz.current) return;
 
             const rowW = rowRef.current?.offsetWidth ?? 320;
-            const off  = latestOffset.current;
+            const off = latestOffset.current;
 
             if (off <= -(rowW * SWIPE_THRESHOLD)) {
                 setOffsetX(0);
@@ -152,15 +200,16 @@ function SwipeDeletedRow({
             }
         }
 
-        el.addEventListener("touchstart",  onTouchStart,  { passive: true });
-        el.addEventListener("touchmove",   onTouchMove,   { passive: false });
-        el.addEventListener("touchend",    onTouchEnd,    { passive: true });
-        el.addEventListener("touchcancel", onTouchEnd,    { passive: true });
+        el.addEventListener("touchstart", onTouchStart, { passive: true });
+        el.addEventListener("touchmove", onTouchMove, { passive: false });
+        el.addEventListener("touchend", onTouchEnd, { passive: true });
+        el.addEventListener("touchcancel", onTouchEnd, { passive: true });
 
         return () => {
-            el.removeEventListener("touchstart",  onTouchStart);
-            el.removeEventListener("touchmove",   onTouchMove);
-            el.removeEventListener("touchend",    onTouchEnd);
+            unlockScroll();
+            el.removeEventListener("touchstart", onTouchStart);
+            el.removeEventListener("touchmove", onTouchMove);
+            el.removeEventListener("touchend", onTouchEnd);
             el.removeEventListener("touchcancel", onTouchEnd);
         };
     }, [item]); // stable — callbacks accessed via refs
@@ -171,7 +220,10 @@ function SwipeDeletedRow({
             <div className="dlt-swipe-row__action dlt-swipe-row__action--left">
                 <button
                     className="dlt-action-btn dlt-action-btn--restore"
-                    onClick={() => { setOffsetX(0); onRestore(item); }}
+                    onClick={() => {
+                        setOffsetX(0);
+                        onRestore(item);
+                    }}
                     type="button"
                 >
                     <Icon name="restore" size={18} />
@@ -183,7 +235,10 @@ function SwipeDeletedRow({
             <div className="dlt-swipe-row__action dlt-swipe-row__action--right">
                 <button
                     className="dlt-action-btn dlt-action-btn--delete"
-                    onClick={() => { setOffsetX(0); onPermanentDelete(item); }}
+                    onClick={() => {
+                        setOffsetX(0);
+                        onPermanentDelete(item);
+                    }}
                     type="button"
                 >
                     <Icon name="delete_forever" size={18} />
@@ -196,27 +251,42 @@ function SwipeDeletedRow({
                 ref={contentRef}
                 className={`dlt-swipe-row__content${selected ? " dlt-swipe-row__content--selected" : ""}`}
                 style={{
-                    transform: selectMode ? "translateX(0)" : `translateX(${offsetX}px)`,
+                    transform: selectMode
+                        ? "translateX(0)"
+                        : `translateX(${offsetX}px)`,
                     transition: active ? "none" : "transform 0.2s ease",
                 }}
                 onClick={() => selectMode && onToggleSelect(item.id)}
             >
                 {selectMode && (
-                    <div className={`dlt-checkbox${selected ? " dlt-checkbox--checked" : ""}`}>
+                    <div
+                        className={`dlt-checkbox${selected ? " dlt-checkbox--checked" : ""}`}
+                    >
                         {selected && <Icon name="check" size={14} />}
                     </div>
                 )}
                 <div
                     className="dlt-row-type-bar"
-                    style={{ background: TYPE_COLORS[item.transactionType] ?? "var(--color-accent)" }}
+                    style={{
+                        background:
+                            TYPE_COLORS[item.transactionType] ??
+                            "var(--color-accent)",
+                    }}
                 />
                 <div className="dlt-row-body">
-                    <span className="dlt-row-category">{item.categoryName}</span>
+                    <span className="dlt-row-category">
+                        {item.entityType === "transaction"
+                            ? (({ income: "Thu nhập", expense: "Chi tiêu", investment: "Đầu tư", saving: "Tiết kiệm" } as Record<string, string>)[item.transactionType] ?? item.transactionType) + (item.categoryName ? ` · ${item.categoryName}` : "")
+                            : item.categoryName}
+                    </span>
                     <span className="dlt-row-date">
-                        {formatDate(item.transactionDate)} · xoá {formatDeletedAt(item.deletedAt)}
+                        {formatDate(item.transactionDate)} · xoá{" "}
+                        {formatDeletedAt(item.deletedAt)}
                     </span>
                 </div>
-                <span className="dlt-row-amount">{formatCurrency(item.amount, item.currency)}</span>
+                <span className="dlt-row-amount">
+                    {formatCurrency(item.amount, item.currency)}
+                </span>
             </div>
         </div>
     );
@@ -229,13 +299,21 @@ export const DeletedTransactionsPage = () => {
     const [loading, setLoading] = useState(true);
     const [selectMode, setSelectMode] = useState(false);
     const [selected, setSelected] = useState<Set<string>>(new Set());
-    const [confirmDelete, setConfirmDelete] = useState<DeletedSplitItem[] | null>(null);
+    const [confirmDelete, setConfirmDelete] = useState<
+        DeletedSplitItem[] | null
+    >(null);
 
     const load = useCallback(async () => {
         setLoading(true);
         try {
-            const data = await transactionsApi.getDeletedSplits();
-            setItems(data);
+            const [splits, txs] = await Promise.all([
+                transactionsApi.getDeletedSplits(),
+                transactionsApi.getDeletedTransactions(),
+            ]);
+            const merged = [...splits, ...txs].sort(
+                (a, b) => new Date(b.deletedAt).getTime() - new Date(a.deletedAt).getTime(),
+            );
+            setItems(merged);
         } catch {
             setItems([]);
         } finally {
@@ -243,12 +321,15 @@ export const DeletedTransactionsPage = () => {
         }
     }, []);
 
-    useEffect(() => { load(); }, [load]);
+    useEffect(() => {
+        load();
+    }, [load]);
 
     function toggleSelect(id: string) {
         setSelected((prev) => {
             const next = new Set(prev);
-            next.has(id) ? next.delete(id) : next.add(id);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
             return next;
         });
     }
@@ -270,7 +351,11 @@ export const DeletedTransactionsPage = () => {
     async function handleRestore(item: DeletedSplitItem) {
         setItems((prev) => prev.filter((i) => i.id !== item.id));
         try {
-            await transactionsApi.restoreSplit(item.transactionId, item.id);
+            if (item.entityType === "transaction") {
+                await transactionsApi.restoreTransaction(item.id);
+            } else {
+                await transactionsApi.restoreSplit(item.transactionId, item.id);
+            }
         } catch {
             setItems((prev) => [item, ...prev]);
         }
@@ -279,12 +364,16 @@ export const DeletedTransactionsPage = () => {
     /* ── Bulk restore ── */
     async function handleBulkRestore() {
         const ids = Array.from(selected);
+        const selectedItems = items.filter((i) => ids.includes(i.id));
         setItems((prev) => prev.filter((i) => !ids.includes(i.id)));
         exitSelectMode();
         try {
-            await transactionsApi.bulkRestoreSplits(ids);
+            const splitIds = selectedItems.filter((i) => i.entityType !== "transaction").map((i) => i.id);
+            const txIds = selectedItems.filter((i) => i.entityType === "transaction").map((i) => i.id);
+            if (splitIds.length) await transactionsApi.bulkRestoreSplits(splitIds);
+            await Promise.all(txIds.map((id) => transactionsApi.restoreTransaction(id)));
         } catch {
-            load(); // revert by reloading
+            load();
         }
     }
 
@@ -297,24 +386,31 @@ export const DeletedTransactionsPage = () => {
         if (!confirmDelete) return;
         const targets = confirmDelete;
         setConfirmDelete(null);
-
-        if (targets.length === 1) {
-            const [target] = targets;
-            setItems((prev) => prev.filter((i) => i.id !== target.id));
-            try {
-                await transactionsApi.hardDeleteSplit(target.transactionId, target.id);
-            } catch {
-                setItems((prev) => [target, ...prev]);
-            }
-        } else {
-            const ids = targets.map((t) => t.id);
-            setItems((prev) => prev.filter((i) => !ids.includes(i.id)));
+        const ids = targets.map((t) => t.id);
+        setItems((prev) => prev.filter((i) => !ids.includes(i.id)));
+        if (targets.length > 1) {
             exitSelectMode();
-            try {
-                await transactionsApi.bulkHardDeleteSplits(ids);
-            } catch {
-                load();
+        } else {
+            setSelected((prev) => {
+                const next = new Set(prev);
+                ids.forEach((id) => next.delete(id));
+                return next;
+            });
+        }
+
+        try {
+            const splits = targets.filter((t) => t.entityType !== "transaction");
+            const txs = targets.filter((t) => t.entityType === "transaction");
+
+            if (splits.length === 1) {
+                await transactionsApi.hardDeleteSplit(splits[0].transactionId, splits[0].id);
+            } else if (splits.length > 1) {
+                await transactionsApi.bulkHardDeleteSplits(splits.map((s) => s.id));
             }
+            await Promise.all(txs.map((t) => transactionsApi.hardDeleteTransaction(t.id)));
+        } catch {
+            if (targets.length === 1) setItems((prev) => [targets[0], ...prev]);
+            else load();
         }
     }
 
@@ -332,7 +428,9 @@ export const DeletedTransactionsPage = () => {
             <div className="dlt-header">
                 <button
                     className="dlt-header__back"
-                    onClick={() => (selectMode ? exitSelectMode() : navigate(-1))}
+                    onClick={() =>
+                        selectMode ? exitSelectMode() : navigate(-1)
+                    }
                     aria-label="Quay lại"
                     type="button"
                 >
@@ -364,19 +462,48 @@ export const DeletedTransactionsPage = () => {
                 {loading ? (
                     [1, 2, 3].map((i) => (
                         <div key={i} className="dlt-skeleton-row">
-                            <span className="skeleton" style={{ width: 4, height: 40, borderRadius: 2 }} />
-                            <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 6 }}>
-                                <span className="skeleton" style={{ width: "50%", height: 14 }} />
-                                <span className="skeleton" style={{ width: "30%", height: 12 }} />
+                            <span
+                                className="skeleton"
+                                style={{
+                                    width: 4,
+                                    height: 40,
+                                    borderRadius: 2,
+                                }}
+                            />
+                            <div
+                                style={{
+                                    flex: 1,
+                                    display: "flex",
+                                    flexDirection: "column",
+                                    gap: 6,
+                                }}
+                            >
+                                <span
+                                    className="skeleton"
+                                    style={{ width: "50%", height: 14 }}
+                                />
+                                <span
+                                    className="skeleton"
+                                    style={{ width: "30%", height: 12 }}
+                                />
                             </div>
-                            <span className="skeleton" style={{ width: 64, height: 16 }} />
+                            <span
+                                className="skeleton"
+                                style={{ width: 64, height: 16 }}
+                            />
                         </div>
                     ))
                 ) : items.length === 0 ? (
                     <div className="dlt-empty">
-                        <Icon name="delete_sweep" size={40} className="dlt-empty__icon" />
+                        <Icon
+                            name="delete_sweep"
+                            size={40}
+                            className="dlt-empty__icon"
+                        />
                         <div className="dlt-empty__title">Không có mục nào</div>
-                        <div className="dlt-empty__text">Các mục đã xoá sẽ xuất hiện ở đây.</div>
+                        <div className="dlt-empty__text">
+                            Các mục đã xoá sẽ xuất hiện ở đây.
+                        </div>
                     </div>
                 ) : (
                     items.map((item) => (

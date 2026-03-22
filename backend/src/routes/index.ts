@@ -7,6 +7,7 @@ import { budgetRouter } from "./budget.routes";
 import { settingsRouter } from "./settings.routes";
 import { receiptsRouter } from "./receipts.routes";
 import { aiRouter } from "./ai.routes";
+import { exchangeRouter } from "./exchange.routes";
 
 export const router = Router();
 
@@ -18,3 +19,4 @@ router.use("/budget", budgetRouter);
 router.use("/settings", settingsRouter);
 router.use("/receipts", receiptsRouter);
 router.use("/ai", aiRouter);
+router.use("/exchange-rate", exchangeRouter);

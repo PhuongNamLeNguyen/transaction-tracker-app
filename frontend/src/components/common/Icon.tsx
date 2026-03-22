@@ -13,7 +13,7 @@ export function Icon({ name, size = 24, filled = false, className = "", style }:
             className={`material-symbols-rounded${className ? ` ${className}` : ""}`}
             style={{
                 fontSize: size,
-                fontVariationSettings: `'FILL' ${filled ? 1 : 0}, 'wght' 400, 'GRAD' 0, 'opsz' ${opsz}`,
+                fontVariationSettings: `'FILL' ${filled ? 1 : 0}, 'wght' 400, 'GRAD' var(--icon-grad), 'opsz' ${opsz}`,
                 lineHeight: 1,
                 display: "inline-flex",
                 alignItems: "center",

@@ -24,19 +24,21 @@ const createReceiptSchema = z.object({
 });
 
 export const transactionsController = {
-    /** GET /transactions?year=&month=&type=&category_id= */
+    /** GET /transactions?year=&month=&type=&category_id= — year/month optional */
     list: asyncHandler(async (req: Request, res: Response) => {
         const userId = req.user!.id;
 
-        const now = new Date();
-        const year = parseInt(req.query.year as string) || now.getFullYear();
-        const month = parseInt(req.query.month as string) || now.getMonth() + 1;
+        const yearStr  = req.query.year  as string | undefined;
+        const monthStr = req.query.month as string | undefined;
+        const year     = yearStr  ? (parseInt(yearStr)  || undefined) : undefined;
+        const month    = monthStr ? (parseInt(monthStr) || undefined) : undefined;
         const type = (req.query.type as string) || undefined;
         const categoryId = (req.query.category_id as string) || undefined;
 
-        if (month < 1 || month > 12) throw new AppError("Invalid month", 400, "VALIDATION_ERROR");
+        if (month != null && (month < 1 || month > 12))
+            throw new AppError("Invalid month", 400, "VALIDATION_ERROR");
 
-        const rows = await transactionsRepo.listByMonth(userId, year, month, type, categoryId);
+        const rows = await transactionsRepo.list(userId, year, month, type, categoryId);
 
         const transactions = rows.map((row) => ({
             id: row.id,
@@ -151,6 +153,15 @@ export const transactionsController = {
         });
     }),
 
+    /** DELETE /transactions/:id — soft-delete entire transaction */
+    deleteTransaction: asyncHandler(async (req: Request, res: Response) => {
+        const userId = req.user!.id;
+        const { id } = req.params;
+        const deleted = await transactionsRepo.softDeleteTransaction(userId, id);
+        if (!deleted) throw new AppError("Transaction not found", 404, "RESOURCE_NOT_FOUND");
+        sendSuccess(res, { success: true });
+    }),
+
     /** DELETE /transactions/:id/splits/:splitId — soft-delete */
     deleteSplit: asyncHandler(async (req: Request, res: Response) => {
         const userId = req.user!.id;
@@ -198,6 +209,43 @@ export const transactionsController = {
         }
         const count = await transactionsRepo.bulkRestoreSplits(userId, splitIds as string[]);
         sendSuccess(res, { restored: count });
+    }),
+
+    /** GET /transactions/deleted — list soft-deleted transactions */
+    getDeletedTransactions: asyncHandler(async (req: Request, res: Response) => {
+        const userId = req.user!.id;
+        const rows = await transactionsRepo.getDeletedTransactions(userId);
+        sendSuccess(res, rows.map((r) => ({
+            id: r.id,
+            transactionId: r.id,
+            transactionType: r.transaction_type,
+            amount: Number(r.amount),
+            currency: r.currency,
+            transactionDate: r.transaction_date,
+            categoryId: "",
+            categoryName: r.note ?? "",
+            categoryIcon: null,
+            deletedAt: r.deleted_at,
+            entityType: "transaction",
+        })));
+    }),
+
+    /** PATCH /transactions/:id/restore — restore soft-deleted transaction */
+    restoreTransaction: asyncHandler(async (req: Request, res: Response) => {
+        const userId = req.user!.id;
+        const { id } = req.params;
+        const restored = await transactionsRepo.restoreTransaction(userId, id);
+        if (!restored) throw new AppError("Transaction not found", 404, "RESOURCE_NOT_FOUND");
+        sendSuccess(res, { success: true });
+    }),
+
+    /** DELETE /transactions/:id/permanent — hard-delete soft-deleted transaction */
+    hardDeleteTransaction: asyncHandler(async (req: Request, res: Response) => {
+        const userId = req.user!.id;
+        const { id } = req.params;
+        const deleted = await transactionsRepo.hardDeleteTransaction(userId, id);
+        if (!deleted) throw new AppError("Transaction not found", 404, "RESOURCE_NOT_FOUND");
+        sendSuccess(res, { success: true });
     }),
 
     /** GET /transactions/splits/deleted — list soft-deleted splits */

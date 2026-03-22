@@ -88,7 +88,8 @@ export const onboardingController = {
             // 1. Update user_settings
             await onboardingRepo.updateUserSettings(userId, day, targetCurrency);
 
-            // 2. Create budget_period
+            // 2. Remove existing periods + budgets, then create fresh ones
+            await onboardingRepo.deleteExistingPeriods(userId);
             const period = await onboardingRepo.createBudgetPeriod(userId, day);
 
             // 3. Create budgets

@@ -1,24 +1,24 @@
 /* ── Budget Page ── */
-.budget-page {
+.plan-page {
     min-height: 100dvh;
     background: var(--color-bg);
     padding-bottom: calc(80px + var(--space-safe-bottom));
 }
 
-.budget-page__header {
+.plan-page__header {
     padding: var(--space-5) var(--space-4) var(--space-2);
     display: flex;
     align-items: center;
     justify-content: space-between;
 }
 
-.budget-page__title {
+.plan-page__title {
     font-size: var(--text-lg);
     font-weight: var(--weight-bold);
     color: var(--color-text-primary);
 }
 
-.budget-page__edit-btn {
+.plan-page__edit-btn {
     font-size: var(--text-sm);
     font-weight: var(--weight-semibold);
     color: var(--color-text-link);
@@ -28,9 +28,9 @@
     padding: var(--space-1) var(--space-2);
 }
 
-.budget-page__edit-btn:active { opacity: 0.7; }
+.plan-page__edit-btn:active { opacity: 0.7; }
 
-.budget-page__body {
+.plan-page__body {
     padding: 0 var(--space-4);
     display: flex;
     flex-direction: column;
@@ -112,34 +112,34 @@
 .summary-chip__value--over    { color: var(--color-expense); }
 
 /* ── Budget Progress List ── */
-.budget-list__title {
+.plan-list__title {
     font-size: var(--text-sm);
     font-weight: var(--weight-semibold);
     color: var(--color-text-primary);
     margin-bottom: var(--space-2);
 }
 
-.budget-list {
+.plan-list {
     display: flex;
     flex-direction: column;
     gap: var(--space-3);
 }
 
-.budget-item {
+.plan-item {
     background: var(--color-surface);
     border-radius: var(--radius-lg);
     padding: var(--space-4);
     box-shadow: var(--shadow-xs);
 }
 
-.budget-item__top {
+.plan-item__top {
     display: flex;
     align-items: center;
     gap: var(--space-3);
     margin-bottom: var(--space-3);
 }
 
-.budget-item__icon {
+.plan-item__icon {
     width: 38px;
     height: 38px;
     border-radius: var(--radius-md);
@@ -151,12 +151,12 @@
     flex-shrink: 0;
 }
 
-.budget-item__info {
+.plan-item__info {
     flex: 1;
     min-width: 0;
 }
 
-.budget-item__name {
+.plan-item__name {
     font-size: var(--text-sm);
     font-weight: var(--weight-semibold);
     color: var(--color-text-primary);
@@ -165,65 +165,65 @@
     text-overflow: ellipsis;
 }
 
-.budget-item__amounts {
+.plan-item__amounts {
     font-size: var(--text-xs);
     color: var(--color-text-secondary);
     margin-top: 2px;
 }
 
-.budget-item__pct {
+.plan-item__pct {
     font-size: var(--text-sm);
     font-weight: var(--weight-bold);
     flex-shrink: 0;
 }
 
-.budget-item__pct--safe     { color: var(--color-budget-safe); }
-.budget-item__pct--warning  { color: var(--color-budget-warning); }
-.budget-item__pct--exceeded { color: var(--color-budget-exceeded); }
+.plan-item__pct--safe     { color: var(--color-plan-safe); }
+.plan-item__pct--warning  { color: var(--color-plan-warning); }
+.plan-item__pct--exceeded { color: var(--color-plan-exceeded); }
 
 /* ── Progress Bar ── */
-.budget-bar {
+.plan-bar {
     height: 8px;
-    background: var(--color-budget-bar-track);
+    background: var(--color-plan-bar-track);
     border-radius: var(--radius-full);
     overflow: hidden;
 }
 
-.budget-bar__fill {
+.plan-bar__fill {
     height: 100%;
     border-radius: var(--radius-full);
     transition: width var(--duration-slow) var(--ease-decelerate);
 }
 
-.budget-bar__fill--safe     { background: var(--color-budget-safe); }
-.budget-bar__fill--warning  { background: var(--color-budget-warning); }
-.budget-bar__fill--exceeded { background: var(--color-budget-exceeded); }
+.plan-bar__fill--safe     { background: var(--color-plan-safe); }
+.plan-bar__fill--warning  { background: var(--color-plan-warning); }
+.plan-bar__fill--exceeded { background: var(--color-plan-exceeded); }
 
 /* ── Empty State ── */
-.budget-empty {
+.plan-empty {
     text-align: center;
     padding: var(--space-16) var(--space-6);
 }
 
-.budget-empty__icon {
+.plan-empty__icon {
     font-size: 56px;
     margin-bottom: var(--space-4);
 }
 
-.budget-empty__title {
+.plan-empty__title {
     font-size: var(--text-base);
     font-weight: var(--weight-bold);
     color: var(--color-text-primary);
     margin-bottom: var(--space-2);
 }
 
-.budget-empty__text {
+.plan-empty__text {
     font-size: var(--text-sm);
     color: var(--color-text-secondary);
     margin-bottom: var(--space-6);
 }
 
-.budget-empty__btn {
+.plan-empty__btn {
     background: var(--color-accent);
     color: var(--color-text-inverse);
     border: none;
@@ -234,7 +234,7 @@
     cursor: pointer;
 }
 
-.budget-empty__btn:active { opacity: 0.85; }
+.plan-empty__btn:active { opacity: 0.85; }
 
 /* ── Skeleton ── */
 .skeleton {

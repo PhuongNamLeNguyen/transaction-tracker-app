@@ -1,7 +1,11 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
-import { settingsApi, type SettingsResponse, type UserPreferences } from "@/api/settings.api";
+import {
+    settingsApi,
+    type SettingsResponse,
+    type UserPreferences,
+} from "@/api/settings.api";
 import { BottomNav } from "@/components/common/BottomNav";
 import { Icon } from "@/components/common/Icon";
 import "@/styles/dashboard.css";
@@ -16,21 +20,32 @@ function formatCurrency(amount: number, currency: string): string {
     }).format(amount);
 }
 
-const CURRENCIES = ["VND", "USD", "EUR", "JPY", "GBP", "SGD", "THB", "CNY", "KRW", "AUD"];
-const LANGUAGES  = [
+const CURRENCIES = [
+    "VND",
+    "USD",
+    "EUR",
+    "JPY",
+    "GBP",
+    "SGD",
+    "THB",
+    "CNY",
+    "KRW",
+    "AUD",
+];
+const LANGUAGES = [
     { value: "vi", label: "Tiếng Việt" },
     { value: "en", label: "English" },
     { value: "ja", label: "日本語" },
     { value: "zh", label: "中文" },
 ];
-const TIMEZONES  = [
+const TIMEZONES = [
     { value: "Asia/Ho_Chi_Minh", label: "Asia/Ho_Chi_Minh (GMT+7)" },
-    { value: "Asia/Bangkok",     label: "Asia/Bangkok (GMT+7)" },
-    { value: "Asia/Tokyo",       label: "Asia/Tokyo (GMT+9)" },
-    { value: "Asia/Singapore",   label: "Asia/Singapore (GMT+8)" },
-    { value: "UTC",              label: "UTC (GMT+0)" },
+    { value: "Asia/Bangkok", label: "Asia/Bangkok (GMT+7)" },
+    { value: "Asia/Tokyo", label: "Asia/Tokyo (GMT+9)" },
+    { value: "Asia/Singapore", label: "Asia/Singapore (GMT+8)" },
+    { value: "UTC", label: "UTC (GMT+0)" },
     { value: "America/New_York", label: "America/New_York (GMT-5)" },
-    { value: "Europe/London",    label: "Europe/London (GMT+0)" },
+    { value: "Europe/London", label: "Europe/London (GMT+0)" },
 ];
 const CYCLE_DAYS = Array.from({ length: 28 }, (_, i) => i + 1);
 
@@ -58,12 +73,13 @@ function PrefSheet<T extends string | number>({
                     <button
                         key={String(opt.value)}
                         className={`pref-option${opt.value === value ? " pref-option--active" : ""}`}
-                        onClick={() => { onSelect(opt.value); onClose(); }}
+                        onClick={() => {
+                            onSelect(opt.value);
+                            onClose();
+                        }}
                     >
                         {opt.label}
-                        {opt.value === value && (
-                            <Icon name="check" size={16} />
-                        )}
+                        {opt.value === value && <Icon name="check" size={16} />}
                     </button>
                 ))}
             </div>
@@ -72,19 +88,34 @@ function PrefSheet<T extends string | number>({
 }
 
 /* ─── Logout Confirm Dialog ─── */
-function LogoutDialog({ onConfirm, onCancel }: { onConfirm: () => void; onCancel: () => void }) {
+function LogoutDialog({
+    onConfirm,
+    onCancel,
+}: {
+    onConfirm: () => void;
+    onCancel: () => void;
+}) {
     return (
         <div className="confirm-overlay" onClick={onCancel}>
-            <div className="confirm-dialog" onClick={(e) => e.stopPropagation()}>
+            <div
+                className="confirm-dialog"
+                onClick={(e) => e.stopPropagation()}
+            >
                 <div className="confirm-dialog__title">Đăng xuất?</div>
                 <div className="confirm-dialog__text">
                     Bạn có chắc muốn đăng xuất khỏi tài khoản không?
                 </div>
                 <div className="confirm-dialog__actions">
-                    <button className="confirm-dialog__btn confirm-dialog__btn--destructive" onClick={onConfirm}>
+                    <button
+                        className="confirm-dialog__btn confirm-dialog__btn--destructive"
+                        onClick={onConfirm}
+                    >
                         Đăng xuất
                     </button>
-                    <button className="confirm-dialog__btn confirm-dialog__btn--cancel" onClick={onCancel}>
+                    <button
+                        className="confirm-dialog__btn confirm-dialog__btn--cancel"
+                        onClick={onCancel}
+                    >
                         Huỷ
                     </button>
                 </div>
@@ -95,49 +126,62 @@ function LogoutDialog({ onConfirm, onCancel }: { onConfirm: () => void; onCancel
 
 /* ─── Chevron Icon ─── */
 function Chevron() {
-    return <Icon name="chevron_right" size={16} className="settings-row__chevron" />;
+    return (
+        <Icon
+            name="chevron_right"
+            size={16}
+            className="settings-row__chevron"
+        />
+    );
 }
 
 /* ─── Icon backgrounds ─── */
 const iconBg: Record<string, string> = {
-    theme:    "#fef0e0",
+    theme: "#fef0e0",
     currency: "#dbeafe",
-    cycle:    "#d1fae5",
+    cycle: "#d1fae5",
     language: "#ede9fe",
     timezone: "#fef3c7",
-    account:  "#fee2e2",
-    budget:   "#fef0e0",
-    deleted:  "#f1f5f9",
+    account: "#fee2e2",
+    plan: "#fef0e0",
+    deleted: "#f1f5f9",
     password: "#f1f5f9",
-    logout:   "#fee2e2",
+    logout: "#fee2e2",
 };
 
 /* ─── Main Page ─── */
 export const SettingsPage = () => {
     const navigate = useNavigate();
-    const { user, logout } = useAuth();
-    const [settingsData, setSettingsData] = useState<SettingsResponse | null>(null);
+    const { user, logout, login } = useAuth();
+    const [settingsData, setSettingsData] = useState<SettingsResponse | null>(
+        null,
+    );
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [openSheet, setOpenSheet] = useState<string | null>(null);
     const [showLogout, setShowLogout] = useState(false);
+    const [editingName, setEditingName] = useState(false);
+    const [nameInput, setNameInput] = useState("");
+    const [savingName, setSavingName] = useState(false);
 
     /* ── Load settings ── */
     useEffect(() => {
-        settingsApi.getSettings()
+        settingsApi
+            .getSettings()
             .then(setSettingsData)
             .catch(() => {})
             .finally(() => setLoading(false));
     }, []);
 
-    const prefs   = settingsData?.preferences;
+    const prefs = settingsData?.preferences;
     const account = settingsData?.account;
 
     /* ── Apply dark mode to DOM ── */
+    const currentTheme = prefs?.theme;
     useEffect(() => {
-        if (!prefs) return;
-        document.documentElement.setAttribute("data-theme", prefs.theme);
-    }, [prefs?.theme]);
+        if (!currentTheme) return;
+        document.documentElement.setAttribute("data-theme", currentTheme);
+    }, [currentTheme]);
 
     /* ── Save a single preference ── */
     async function savePref(update: Partial<UserPreferences>) {
@@ -145,18 +189,50 @@ export const SettingsPage = () => {
         setSaving(true);
 
         // Optimistic update
-        setSettingsData((prev) => prev
-            ? { ...prev, preferences: { ...prev.preferences!, ...update } }
-            : prev
+        setSettingsData((prev) =>
+            prev
+                ? { ...prev, preferences: { ...prev.preferences!, ...update } }
+                : prev,
         );
 
         try {
-            await settingsApi.updateSettings(update as Parameters<typeof settingsApi.updateSettings>[0]);
+            await settingsApi.updateSettings(
+                update as Parameters<typeof settingsApi.updateSettings>[0],
+            );
         } catch {
             // Revert on error — just reload
-            settingsApi.getSettings().then(setSettingsData).catch(() => {});
+            settingsApi
+                .getSettings()
+                .then(setSettingsData)
+                .catch(() => {});
         } finally {
             setSaving(false);
+        }
+    }
+
+    /* ── Edit name ── */
+    function startEditName() {
+        setNameInput(user?.name || "");
+        setEditingName(true);
+    }
+
+    function cancelEditName() {
+        setEditingName(false);
+        setNameInput("");
+    }
+
+    async function saveEditName() {
+        const trimmed = nameInput.trim();
+        if (!trimmed || trimmed === user?.name || savingName) return;
+        setSavingName(true);
+        try {
+            await settingsApi.updateName(trimmed);
+            if (user) login({ ...user, name: trimmed });
+            setEditingName(false);
+        } catch {
+            // silent fail — keep editing
+        } finally {
+            setSavingName(false);
         }
     }
 
@@ -167,8 +243,16 @@ export const SettingsPage = () => {
         navigate("/login", { replace: true });
     }
 
-    const langLabel = LANGUAGES.find((l) => l.value === prefs?.systemLanguage)?.label ?? prefs?.systemLanguage ?? "—";
-    const tzLabel   = TIMEZONES.find((t) => t.value === prefs?.timeZone)?.label?.split(" ")[0] ?? prefs?.timeZone ?? "—";
+    const langLabel =
+        LANGUAGES.find((l) => l.value === prefs?.systemLanguage)?.label ??
+        prefs?.systemLanguage ??
+        "—";
+    const tzLabel =
+        TIMEZONES.find((t) => t.value === prefs?.timeZone)?.label?.split(
+            " ",
+        )[0] ??
+        prefs?.timeZone ??
+        "—";
 
     return (
         <div className="settings-page">
@@ -180,9 +264,56 @@ export const SettingsPage = () => {
                     <div className="settings-profile__avatar">
                         {user?.name ? user.name.charAt(0).toUpperCase() : "U"}
                     </div>
-                    <div>
-                        <div className="settings-profile__name">{user?.name || "Người dùng"}</div>
-                        <div className="settings-profile__email">{user?.email}</div>
+                    <div className="settings-profile__info">
+                        <div className="settings-profile__name-row">
+                            {editingName ? (
+                                <input
+                                    className="settings-profile__name-input"
+                                    value={nameInput}
+                                    onChange={(e) =>
+                                        setNameInput(e.target.value)
+                                    }
+                                    onKeyDown={(e) => {
+                                        if (e.key === "Enter") saveEditName();
+                                        if (e.key === "Escape")
+                                            cancelEditName();
+                                    }}
+                                    maxLength={100}
+                                    autoFocus
+                                />
+                            ) : (
+                                <div className="settings-profile__name">
+                                    {user?.name || "Người dùng"}
+                                </div>
+                            )}
+                            {editingName ? (
+                                <div className="settings-profile__name-actions">
+                                    <button
+                                        className="settings-profile__name-btn settings-profile__name-btn--confirm"
+                                        onClick={saveEditName}
+                                        disabled={savingName}
+                                    >
+                                        <Icon name="check" size={16} />
+                                    </button>
+                                    <button
+                                        className="settings-profile__name-btn settings-profile__name-btn--cancel"
+                                        onClick={cancelEditName}
+                                    >
+                                        <Icon name="close" size={16} />
+                                    </button>
+                                </div>
+                            ) : (
+                                <button
+                                    className="settings-profile__edit-btn"
+                                    onClick={startEditName}
+                                >
+                                    <Icon name="edit" size={16} />
+                                </button>
+                            )}
+                        </div>
+                        <div className="settings-profile__email">
+                            {user?.email}
+                        </div>
                     </div>
                 </div>
 
@@ -192,24 +323,38 @@ export const SettingsPage = () => {
                     <div className="settings-card">
                         {/* Theme */}
                         <div className="settings-row settings-row--no-action">
-                            <div className="settings-row__icon" style={{ background: iconBg.theme }}>🎨</div>
+                            <div
+                                className="settings-row__icon"
+                                style={{ background: iconBg.theme }}
+                            >
+                                <Icon name="palette" size={20} />
+                            </div>
                             <div className="settings-row__body">
-                                <div className="settings-row__label">Giao diện</div>
+                                <div className="settings-row__label">
+                                    Giao diện
+                                </div>
                             </div>
                             <div className="settings-row__value">
                                 {loading ? (
-                                    <span className="skeleton" style={{ width: 90, height: 28 }} />
+                                    <span
+                                        className="skeleton"
+                                        style={{ width: 90, height: 28 }}
+                                    />
                                 ) : (
                                     <div className="theme-toggle">
                                         <button
                                             className={`theme-toggle__btn${prefs?.theme === "light" ? " theme-toggle__btn--active" : ""}`}
-                                            onClick={() => savePref({ theme: "light" })}
+                                            onClick={() =>
+                                                savePref({ theme: "light" })
+                                            }
                                         >
                                             Sáng
                                         </button>
                                         <button
                                             className={`theme-toggle__btn${prefs?.theme === "dark" ? " theme-toggle__btn--active" : ""}`}
-                                            onClick={() => savePref({ theme: "dark" })}
+                                            onClick={() =>
+                                                savePref({ theme: "dark" })
+                                            }
                                         >
                                             Tối
                                         </button>
@@ -223,12 +368,26 @@ export const SettingsPage = () => {
                             className="settings-row"
                             onClick={() => setOpenSheet("currency")}
                         >
-                            <div className="settings-row__icon" style={{ background: iconBg.currency }}>💱</div>
+                            <div
+                                className="settings-row__icon"
+                                style={{ background: iconBg.currency }}
+                            >
+                                <Icon name="currency_exchange" size={20} />
+                            </div>
                             <div className="settings-row__body">
-                                <div className="settings-row__label">Tiền tệ hiển thị</div>
+                                <div className="settings-row__label">
+                                    Tiền tệ hiển thị
+                                </div>
                             </div>
                             <div className="settings-row__value">
-                                {loading ? <span className="skeleton" style={{ width: 40, height: 16 }} /> : (prefs?.targetCurrency ?? "—")}
+                                {loading ? (
+                                    <span
+                                        className="skeleton"
+                                        style={{ width: 40, height: 16 }}
+                                    />
+                                ) : (
+                                    (prefs?.targetCurrency ?? "—")
+                                )}
                                 <Chevron />
                             </div>
                         </button>
@@ -238,13 +397,31 @@ export const SettingsPage = () => {
                             className="settings-row"
                             onClick={() => setOpenSheet("cycle")}
                         >
-                            <div className="settings-row__icon" style={{ background: iconBg.cycle }}>📅</div>
+                            <div
+                                className="settings-row__icon"
+                                style={{ background: iconBg.cycle }}
+                            >
+                                <Icon name="calendar_month" size={20} />
+                            </div>
                             <div className="settings-row__body">
-                                <div className="settings-row__label">Ngày bắt đầu chu kỳ</div>
-                                <div className="settings-row__sublabel">Ngày tính ngân sách mỗi tháng</div>
+                                <div className="settings-row__label">
+                                    Ngày bắt đầu chu kỳ
+                                </div>
+                                <div className="settings-row__sublabel">
+                                    Ngày bắt đầu chu kỳ kế hoạch mỗi tháng
+                                </div>
                             </div>
                             <div className="settings-row__value">
-                                {loading ? <span className="skeleton" style={{ width: 32, height: 16 }} /> : (prefs?.cycleStartDay ? `Ngày ${prefs.cycleStartDay}` : "—")}
+                                {loading ? (
+                                    <span
+                                        className="skeleton"
+                                        style={{ width: 32, height: 16 }}
+                                    />
+                                ) : prefs?.cycleStartDay ? (
+                                    `Ngày ${prefs.cycleStartDay}`
+                                ) : (
+                                    "—"
+                                )}
                                 <Chevron />
                             </div>
                         </button>
@@ -254,12 +431,26 @@ export const SettingsPage = () => {
                             className="settings-row"
                             onClick={() => setOpenSheet("language")}
                         >
-                            <div className="settings-row__icon" style={{ background: iconBg.language }}>🌐</div>
+                            <div
+                                className="settings-row__icon"
+                                style={{ background: iconBg.language }}
+                            >
+                                <Icon name="language" size={20} />
+                            </div>
                             <div className="settings-row__body">
-                                <div className="settings-row__label">Ngôn ngữ</div>
+                                <div className="settings-row__label">
+                                    Ngôn ngữ
+                                </div>
                             </div>
                             <div className="settings-row__value">
-                                {loading ? <span className="skeleton" style={{ width: 60, height: 16 }} /> : langLabel}
+                                {loading ? (
+                                    <span
+                                        className="skeleton"
+                                        style={{ width: 60, height: 16 }}
+                                    />
+                                ) : (
+                                    langLabel
+                                )}
                                 <Chevron />
                             </div>
                         </button>
@@ -269,12 +460,26 @@ export const SettingsPage = () => {
                             className="settings-row"
                             onClick={() => setOpenSheet("timezone")}
                         >
-                            <div className="settings-row__icon" style={{ background: iconBg.timezone }}>🕐</div>
+                            <div
+                                className="settings-row__icon"
+                                style={{ background: iconBg.timezone }}
+                            >
+                                <Icon name="schedule" size={20} />
+                            </div>
                             <div className="settings-row__body">
-                                <div className="settings-row__label">Múi giờ</div>
+                                <div className="settings-row__label">
+                                    Múi giờ
+                                </div>
                             </div>
                             <div className="settings-row__value">
-                                {loading ? <span className="skeleton" style={{ width: 80, height: 16 }} /> : tzLabel}
+                                {loading ? (
+                                    <span
+                                        className="skeleton"
+                                        style={{ width: 80, height: 16 }}
+                                    />
+                                ) : (
+                                    tzLabel
+                                )}
                                 <Chevron />
                             </div>
                         </button>
@@ -287,17 +492,32 @@ export const SettingsPage = () => {
                     <div className="settings-card">
                         {/* Account row */}
                         <button className="settings-row">
-                            <div className="settings-row__icon" style={{ background: iconBg.account }}>💳</div>
+                            <div
+                                className="settings-row__icon"
+                                style={{ background: iconBg.account }}
+                            >
+                                <Icon name="credit_card" size={20} />
+                            </div>
                             <div className="settings-row__body">
-                                <div className="settings-row__label">{account?.name || "Tài khoản của tôi"}</div>
+                                <div className="settings-row__label">
+                                    {account?.name || "Tài khoản của tôi"}
+                                </div>
                                 {account && (
                                     <div className="settings-row__sublabel">
-                                        {formatCurrency(account.balance, account.currency)}
+                                        {formatCurrency(
+                                            account.balance,
+                                            account.currency,
+                                        )}
                                     </div>
                                 )}
                             </div>
                             <div className="settings-row__value">
-                                {loading && <span className="skeleton" style={{ width: 70, height: 16 }} />}
+                                {loading && (
+                                    <span
+                                        className="skeleton"
+                                        style={{ width: 70, height: 16 }}
+                                    />
+                                )}
                                 <Chevron />
                             </div>
                         </button>
@@ -307,9 +527,16 @@ export const SettingsPage = () => {
                             className="settings-row"
                             onClick={() => navigate("/onboarding")}
                         >
-                            <div className="settings-row__icon" style={{ background: iconBg.budget }}>📊</div>
+                            <div
+                                className="settings-row__icon"
+                                style={{ background: iconBg.plan }}
+                            >
+                                <Icon name="bar_chart" size={20} />
+                            </div>
                             <div className="settings-row__body">
-                                <div className="settings-row__label">Chỉnh sửa kế hoạch</div>
+                                <div className="settings-row__label">
+                                    Chỉnh sửa kế hoạch
+                                </div>
                             </div>
                             <Chevron />
                         </button>
@@ -320,10 +547,20 @@ export const SettingsPage = () => {
                 <div>
                     <div className="settings-section__label">Dữ liệu</div>
                     <div className="settings-card">
-                        <button className="settings-row" onClick={() => navigate("/deleted-transactions")}>
-                            <div className="settings-row__icon" style={{ background: iconBg.deleted }}>🗑️</div>
+                        <button
+                            className="settings-row"
+                            onClick={() => navigate("/deleted-transactions")}
+                        >
+                            <div
+                                className="settings-row__icon"
+                                style={{ background: iconBg.deleted }}
+                            >
+                                <Icon name="delete" size={20} />
+                            </div>
                             <div className="settings-row__body">
-                                <div className="settings-row__label">Giao dịch đã xoá</div>
+                                <div className="settings-row__label">
+                                    Giao dịch đã xoá
+                                </div>
                             </div>
                             <Chevron />
                         </button>
@@ -332,12 +569,21 @@ export const SettingsPage = () => {
 
                 {/* PROFILE */}
                 <div>
-                    <div className="settings-section__label">Tài khoản người dùng</div>
+                    <div className="settings-section__label">
+                        Tài khoản người dùng
+                    </div>
                     <div className="settings-card">
                         <button className="settings-row">
-                            <div className="settings-row__icon" style={{ background: iconBg.password }}>🔑</div>
+                            <div
+                                className="settings-row__icon"
+                                style={{ background: iconBg.password }}
+                            >
+                                <Icon name="key" size={20} />
+                            </div>
                             <div className="settings-row__body">
-                                <div className="settings-row__label">Đổi mật khẩu</div>
+                                <div className="settings-row__label">
+                                    Đổi mật khẩu
+                                </div>
                             </div>
                             <Chevron />
                         </button>
@@ -346,9 +592,16 @@ export const SettingsPage = () => {
                             className="settings-row settings-row--destructive"
                             onClick={() => setShowLogout(true)}
                         >
-                            <div className="settings-row__icon" style={{ background: "#fee2e2" }}>🚪</div>
+                            <div
+                                className="settings-row__icon"
+                                style={{ background: "#fee2e2" }}
+                            >
+                                <Icon name="logout" size={20} />
+                            </div>
                             <div className="settings-row__body">
-                                <div className="settings-row__label">Đăng xuất</div>
+                                <div className="settings-row__label">
+                                    Đăng xuất
+                                </div>
                             </div>
                         </button>
                     </div>
@@ -370,7 +623,10 @@ export const SettingsPage = () => {
             {openSheet === "cycle" && prefs && (
                 <PrefSheet
                     title="Ngày bắt đầu chu kỳ (1–28)"
-                    options={CYCLE_DAYS.map((d) => ({ value: d, label: `Ngày ${d}` }))}
+                    options={CYCLE_DAYS.map((d) => ({
+                        value: d,
+                        label: `Ngày ${d}`,
+                    }))}
                     value={prefs.cycleStartDay ?? 1}
                     onSelect={(v) => savePref({ cycleStartDay: v as number })}
                     onClose={() => setOpenSheet(null)}
@@ -388,7 +644,10 @@ export const SettingsPage = () => {
             {openSheet === "timezone" && prefs && (
                 <PrefSheet
                     title="Chọn múi giờ"
-                    options={TIMEZONES.map((t) => ({ value: t.value, label: t.label }))}
+                    options={TIMEZONES.map((t) => ({
+                        value: t.value,
+                        label: t.label,
+                    }))}
                     value={prefs.timeZone}
                     onSelect={(v) => savePref({ timeZone: v as string })}
                     onClose={() => setOpenSheet(null)}

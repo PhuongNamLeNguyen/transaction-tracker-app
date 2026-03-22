@@ -31,6 +31,49 @@ export interface AiReceiptData {
 
 type SupportedImageMime = "image/jpeg" | "image/png" | "image/gif" | "image/webp";
 
+/* ─── Currency normalisation ─────────────────────────────────────────────── */
+const CURRENCY_SYMBOL_MAP: Record<string, string> = {
+    "¥": "JPY",   // Ambiguous (also CNY) but JPY far more common on receipts
+    "円": "JPY",
+    "yen": "JPY",
+    "jpy": "JPY",
+    "$": "USD",
+    "usd": "USD",
+    "us$": "USD",
+    "€": "EUR",
+    "eur": "EUR",
+    "£": "GBP",
+    "gbp": "GBP",
+    "₫": "VND",
+    "vnd": "VND",
+    "dong": "VND",
+    "₩": "KRW",
+    "krw": "KRW",
+    "won": "KRW",
+    "฿": "THB",
+    "thb": "THB",
+    "baht": "THB",
+    "s$": "SGD",
+    "sgd": "SGD",
+    "rmb": "CNY",
+    "cny": "CNY",
+    "元": "CNY",
+    "a$": "AUD",
+    "aud": "AUD",
+    "c$": "CAD",
+    "cad": "CAD",
+};
+
+function normalizeCurrency(raw: string | null | undefined): string | null {
+    if (!raw) return null;
+    const trimmed = raw.trim();
+    if (!trimmed) return null;
+    // Already a valid ISO 4217 three-letter code
+    if (/^[A-Za-z]{3}$/.test(trimmed)) return trimmed.toUpperCase();
+    const lower = trimmed.toLowerCase();
+    return CURRENCY_SYMBOL_MAP[lower] ?? CURRENCY_SYMBOL_MAP[trimmed] ?? trimmed.toUpperCase().slice(0, 3);
+}
+
 const IMAGE_MIMES: SupportedImageMime[] = ["image/jpeg", "image/png", "image/gif", "image/webp"];
 
 /**
@@ -61,7 +104,7 @@ Return ONLY valid JSON with this exact structure (no markdown, no extra text):
   "storeAddress": "address or null",
   "transactionDate": "ISO8601 datetime or null",
   "totalAmount": <number or null>,
-  "currency": "currency code (e.g. VND, USD, JPY) or null",
+  "currency": "ISO 4217 three-letter code ONLY (e.g. JPY, VND, USD, KRW, EUR, GBP, CNY, THB, SGD). Never use symbols like ¥ or $. Infer from receipt language/country if not printed. null only if truly unknown.",
   "taxAmount": <number or null>,
   "discountAmount": <number or null>,
   "items": [
@@ -185,6 +228,8 @@ Rules:
         const parsed = JSON.parse(jsonMatch[0]) as AiReceiptData;
         // Ensure items is always an array
         if (!Array.isArray(parsed.items)) parsed.items = [];
+        // Normalize currency to ISO 4217 (handle symbols like ¥, 円, $, etc.)
+        parsed.currency = normalizeCurrency(parsed.currency);
         return parsed;
     } catch (parseErr) {
         console.error("[ai.service] JSON parse error:", parseErr);

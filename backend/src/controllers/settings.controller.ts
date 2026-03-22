@@ -33,7 +33,15 @@ export const settingsController = {
     /** PATCH /settings */
     updateSettings: asyncHandler(async (req: Request, res: Response) => {
         const userId = req.user!.id;
-        const { theme, targetCurrency, cycleStartDay, systemLanguage, timeZone } = req.body;
+        const { name, theme, targetCurrency, cycleStartDay, systemLanguage, timeZone } = req.body;
+
+        if (name !== undefined) {
+            const trimmed = String(name).trim();
+            if (!trimmed || trimmed.length > 100) {
+                return sendSuccess(res, { updated: false });
+            }
+            await settingsRepo.updateUserName(userId, trimmed);
+        }
 
         const ALLOWED_THEMES = ["light", "dark"];
         if (theme !== undefined && !ALLOWED_THEMES.includes(theme)) {
