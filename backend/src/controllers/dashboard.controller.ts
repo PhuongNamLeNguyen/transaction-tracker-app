@@ -3,30 +3,50 @@ import { asyncHandler } from "../utils/asyncHandler";
 import { sendSuccess } from "../utils/response";
 import { AppError } from "../utils/AppError";
 import { dashboardRepo } from "../repositories/dashboard.repo";
+import { exchangeRepo } from "../repositories/exchange.repo";
+
+/** Convert a VND amount to the display currency using the given rate. */
+function conv(amount: number, rate: number): number {
+    if (rate === 1) return amount;
+    return parseFloat((amount * rate).toFixed(2));
+}
+
+/** Fetch the VND → displayCurrency rate (1 if same or not found). */
+async function getRate(accountCurrency: string, displayCurrency: string): Promise<number> {
+    if (accountCurrency === displayCurrency) return 1;
+    const rate = await exchangeRepo.getRate(accountCurrency, displayCurrency);
+    return rate ?? 1;
+}
 
 export const dashboardController = {
     /** GET /dashboard — aggregated home screen data */
     getDashboard: asyncHandler(async (req: Request, res: Response) => {
         const userId = req.user!.id;
 
-        // Active budget period (null if not set up yet)
-        const period = await dashboardRepo.getActivePeriod(userId);
+        const [period, account, displayCurrency] = await Promise.all([
+            dashboardRepo.getActivePeriod(userId),
+            dashboardRepo.getAccountBalance(userId),
+            dashboardRepo.getDisplayCurrency(userId),
+        ]);
 
-        // Account balance (null if account not created yet)
-        const account = await dashboardRepo.getAccountBalance(userId);
+        const accountCurrency: string = account?.currency ?? "VND";
+        const rate = await getRate(accountCurrency, displayCurrency);
 
         if (!period) {
-            // No active period → return empty dashboard
             return sendSuccess(res, {
                 period: null,
-                summary: { income: 0, expense: 0, investment: 0, saving: 0, balance: account?.balance ?? 0, currency: account?.currency ?? "VND" },
+                summary: {
+                    income: 0, expense: 0, investment: 0, saving: 0,
+                    balance: conv(Number(account?.balance ?? 0), rate),
+                    currency: displayCurrency,
+                },
                 categoryBreakdown: { income: [], expense: [], investment: [], saving: [] },
                 budgetProgress: [],
                 transactions: [],
+                displayCurrency,
             });
         }
 
-        // Fetch all data in parallel
         const [summaryRows, breakdownRows, budgetRows, txRows] = await Promise.all([
             dashboardRepo.getSummary(userId, period.id),
             dashboardRepo.getCategoryBreakdown(userId, period.id),
@@ -34,18 +54,18 @@ export const dashboardController = {
             dashboardRepo.getRecentTransactions(userId, period.id),
         ]);
 
-        // Build summary object
-        const summary = {
-            income: 0, expense: 0, investment: 0, saving: 0,
-            balance: account ? Number(account.balance) : 0,
-            currency: account?.currency ?? "VND",
-        };
+        // Build summary — all amounts converted
+        const summaryAmounts: Record<string, number> = { income: 0, expense: 0, investment: 0, saving: 0 };
         for (const row of summaryRows) {
-            const key = row.type as keyof typeof summary;
-            if (key in summary) (summary as Record<string, number>)[key] = Number(row.total);
+            if (row.type in summaryAmounts) summaryAmounts[row.type] = conv(Number(row.total), rate);
         }
+        const summary = {
+            ...summaryAmounts,
+            balance: conv(account ? Number(account.balance) : 0, rate),
+            currency: displayCurrency,
+        };
 
-        // Group category breakdown by type
+        // Category breakdown — convert totals, recompute percentages after conversion
         const categoryBreakdown: Record<string, unknown[]> = {
             income: [], expense: [], investment: [], saving: [],
         };
@@ -56,12 +76,12 @@ export const dashboardController = {
                     categoryId: row.category_id,
                     name: row.category_name,
                     icon: row.category_icon,
-                    total: Number(row.total),
+                    total: conv(Number(row.total), rate),
                 });
             }
         }
 
-        // Compute percentages per type
+        // Recompute percentages after conversion (ratios are unchanged, but keeps consistency)
         for (const type of Object.keys(categoryBreakdown)) {
             const items = categoryBreakdown[type] as Array<{ total: number; percentage?: number }>;
             const typeTotal = items.reduce((s, i) => s + i.total, 0);
@@ -70,27 +90,31 @@ export const dashboardController = {
             }
         }
 
-        // Budget progress
-        const budgetProgress = budgetRows.map((row) => ({
-            categoryId: row.category_id,
-            name: row.category_name,
-            icon: row.category_icon,
-            budgetAmount: Number(row.budget_amount),
-            actualAmount: Number(row.actual_amount),
-            utilisationPct: row.budget_amount > 0
-                ? Math.round((Number(row.actual_amount) / Number(row.budget_amount)) * 1000) / 10
-                : 0,
-            currency: row.budget_currency,
-        }));
+        // Budget progress — convert budgetAmount and actualAmount
+        const budgetProgress = budgetRows.map((row) => {
+            const budgetAmount = conv(Number(row.budget_amount), rate);
+            const actualAmount = conv(Number(row.actual_amount), rate);
+            return {
+                categoryId: row.category_id,
+                name: row.category_name,
+                icon: row.category_icon,
+                budgetAmount,
+                actualAmount,
+                utilisationPct: budgetAmount > 0
+                    ? Math.round((actualAmount / budgetAmount) * 1000) / 10
+                    : 0,
+                currency: displayCurrency,
+            };
+        });
 
-        // Transactions
+        // Recent transactions — convert amounts
         const transactions = txRows.map((row) => ({
             transactionId: row.id,
             transactionDate: row.transaction_date,
             createdAt: row.created_at,
             type: row.type,
-            amount: Number(row.amount),
-            currency: row.currency,
+            amount: conv(Number(row.amount), rate),
+            currency: displayCurrency,
             merchantName: row.merchant_name ?? null,
             note: row.note ?? null,
             source: row.source,
@@ -109,6 +133,7 @@ export const dashboardController = {
             categoryBreakdown,
             budgetProgress,
             transactions,
+            displayCurrency,
         });
     }),
 
@@ -121,21 +146,22 @@ export const dashboardController = {
 
         if (month < 1 || month > 12) throw new AppError("Invalid month", 400, "VALIDATION_ERROR");
 
-        const [rows, account] = await Promise.all([
+        const [rows, displayCurrency] = await Promise.all([
             dashboardRepo.getExpenseBreakdownByMonth(userId, year, month),
-            dashboardRepo.getAccountBalance(userId),
+            dashboardRepo.getDisplayCurrency(userId),
         ]);
 
-        const currency = account?.currency ?? "VND";
+        const rate = await getRate("VND", displayCurrency);
+
         const categories = rows.map((r) => ({
             categoryId: r.category_id,
             name:       r.category_name,
             icon:       r.category_icon ?? null,
-            amount:     Number(r.total),
-            currency,
+            amount:     conv(Number(r.total), rate),
+            currency:   displayCurrency,
         }));
 
-        sendSuccess(res, { categories, currency });
+        sendSuccess(res, { categories, currency: displayCurrency });
     }),
 
     /** GET /dashboard/cashflow?year=&month= */
@@ -147,14 +173,18 @@ export const dashboardController = {
 
         if (month < 1 || month > 12) throw new AppError("Invalid month", 400, "VALIDATION_ERROR");
 
-        const [summaryRows, account] = await Promise.all([
+        const [summaryRows, displayCurrency] = await Promise.all([
             dashboardRepo.getSummaryByMonth(userId, year, month),
-            dashboardRepo.getAccountBalance(userId),
+            dashboardRepo.getDisplayCurrency(userId),
         ]);
 
-        const cashflow = { income: 0, expense: 0, investment: 0, saving: 0, currency: account?.currency ?? "VND" };
+        const rate = await getRate("VND", displayCurrency);
+
+        const cashflow: Record<string, number | string> = {
+            income: 0, expense: 0, investment: 0, saving: 0, currency: displayCurrency,
+        };
         for (const row of summaryRows) {
-            if (row.type in cashflow) (cashflow as Record<string, number>)[row.type] = Number(row.total);
+            if (row.type in cashflow) cashflow[row.type] = conv(Number(row.total), rate);
         }
 
         sendSuccess(res, cashflow);

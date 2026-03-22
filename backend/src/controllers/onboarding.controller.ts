@@ -92,11 +92,11 @@ export const onboardingController = {
             await onboardingRepo.deleteExistingPeriods(userId);
             const period = await onboardingRepo.createBudgetPeriod(userId, day);
 
-            // 3. Create budgets
-            await onboardingRepo.createBudgets(period.id, budgets, targetCurrency);
+            // 3. Create budgets (always VND — targetCurrency is display-only)
+            await onboardingRepo.createBudgets(period.id, budgets, "VND");
 
-            // 4. Ensure user has a default account
-            await onboardingRepo.createDefaultAccountIfMissing(userId, targetCurrency);
+            // 4. Ensure user has a default account (always VND)
+            await onboardingRepo.createDefaultAccountIfMissing(userId, "VND");
         } catch (dbErr: unknown) {
             const msg = dbErr instanceof Error ? dbErr.message : String(dbErr);
             console.error("[onboarding.setup] DB error:", msg);

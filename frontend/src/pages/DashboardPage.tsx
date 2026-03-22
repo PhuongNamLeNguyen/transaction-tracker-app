@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import {
     dashboardApi,
@@ -6,7 +7,11 @@ import {
     type DashboardTransaction,
     type CashflowSummary,
 } from "@/api/dashboard.api";
-import { transactionsApi, type TxDetail } from "@/api/transactions.api";
+import {
+    transactionsApi,
+    type TxDetail,
+    type TransactionType,
+} from "@/api/transactions.api";
 import { BottomNav } from "@/components/common/BottomNav";
 import { Icon } from "@/components/common/Icon";
 import "@/styles/dashboard.css";
@@ -57,18 +62,34 @@ function typeSign(type: DashboardTransaction["type"]): string {
     return type === "income" ? "+" : "-";
 }
 
+const TYPE_LABELS: Record<string, string> = {
+    income:     "Thu nhập",
+    expense:    "Chi tiêu",
+    investment: "Đầu tư",
+    saving:     "Tiết kiệm",
+};
+
+const TYPE_COLORS: Record<TransactionType, string> = {
+    income:     "var(--color-income)",
+    expense:    "var(--color-expense)",
+    investment: "var(--color-investment)",
+    saving:     "var(--color-saving)",
+};
+
+type EditingField = "date" | "note" | "merchant" | null;
+
 /* ─────────────────────────────────────────
    SVG Pie Chart
 ───────────────────────────────────────── */
 const SLICE_COLORS = {
-    expense: "#dc2626",
+    expense:    "#dc2626",
     investment: "#7c3aed",
-    saving: "#2563eb",
-    available: "#e07b39",
+    saving:     "#2563eb",
+    available:  "#e07b39",
 };
 
 interface SliceData {
-    key: string;
+    key:   string;
     label: string;
     value: number;
     color: string;
@@ -135,67 +156,221 @@ function PieChart({ slices }: { slices: SliceData[] }) {
 }
 
 /* ─────────────────────────────────────────
-   Detail Sheet (reused from TransactionsPage)
+   Full Detail Sheet (matches TransactionsPage)
 ───────────────────────────────────────── */
-function DetailSheet({ tx, onClose }: { tx: TxDetail; onClose: () => void }) {
-    const primaryCategory = tx.splits[0]?.categoryName ?? null;
+function DetailSheet({
+    tx,
+    onClose,
+    onDelete,
+    onUpdate,
+}: {
+    tx: TxDetail;
+    onClose: () => void;
+    onDelete: (id: string) => void;
+    onUpdate: (id: string) => void;
+}) {
+    const splits = tx.splits;
     const timeStr = formatTime(tx.createdAt);
     const dateStr = formatDateShort(tx.transactionDate);
+    const typeColor = TYPE_COLORS[tx.type];
+    const categoryLabel = splits.map((s) => s.categoryName).join(", ");
+
+    const [editingField, setEditingField] = useState<EditingField>(null);
+    const [tempDate, setTempDate]         = useState(tx.transactionDate.slice(0, 10));
+    const [tempNote, setTempNote]         = useState(tx.note ?? "");
+    const [tempMerchant, setTempMerchant] = useState(tx.merchantName ?? "");
+    const [saving, setSaving]             = useState(false);
+
+    async function handleSave(field: EditingField) {
+        if (!field || saving) return;
+        setSaving(true);
+        try {
+            const dto =
+                field === "date"     ? { transactionDate: tempDate } :
+                field === "note"     ? { note: tempNote || null } :
+                                       { merchantName: tempMerchant || null };
+            await transactionsApi.update(tx.id, dto);
+            onUpdate(tx.id);
+            setEditingField(null);
+        } catch {
+            // keep editing open on error
+        } finally {
+            setSaving(false);
+        }
+    }
+
+    function handleCancel() {
+        setTempDate(tx.transactionDate.slice(0, 10));
+        setTempNote(tx.note ?? "");
+        setTempMerchant(tx.merchantName ?? "");
+        setEditingField(null);
+    }
 
     return (
         <>
             <div className="detail-sheet-overlay" onClick={onClose} />
             <div className="detail-sheet">
                 <div className="detail-sheet__topbar">
-                    <button className="detail-sheet__close" onClick={onClose} aria-label="Đóng">
+                    <button
+                        className="detail-sheet__close"
+                        onClick={onClose}
+                        aria-label="Đóng"
+                    >
                         <Icon name="close" size={20} />
                     </button>
                     <span className="detail-sheet__title">Thông tin giao dịch</span>
-                    <div style={{ width: 28 }} />
+                    <button
+                        className="detail-sheet__delete"
+                        onClick={() => onDelete(tx.id)}
+                        aria-label="Xoá giao dịch"
+                        type="button"
+                    >
+                        <Icon name="delete" size={20} />
+                    </button>
                 </div>
-                <div className="detail-sheet__body">
-                    <div className="detail-row">
-                        <span className="detail-row__label">Nội dung</span>
-                        <span className="detail-row__value">{tx.note ?? tx.splits[0]?.categoryName ?? "Giao dịch"}</span>
-                    </div>
-                    <div className="detail-row">
-                        <span className="detail-row__label">Số tiền</span>
-                        <span className="detail-row__value detail-row__value--amount">
-                            {formatCurrency(tx.amount, tx.currency)}
-                        </span>
-                    </div>
-                    <div className="detail-row">
-                        <span className="detail-row__label">Ngày giờ</span>
-                        <span className="detail-row__value">{timeStr} – {dateStr}</span>
-                    </div>
-                    {primaryCategory && (
+
+                <div className="detail-sheet__scroll">
+                    <div className="detail-sheet__body">
+
+                        {/* ── Loại ── */}
                         <div className="detail-row">
-                            <span className="detail-row__label">Danh mục</span>
-                            <span className="detail-row__value">{primaryCategory}</span>
+                            <span className="detail-row__label">Loại</span>
+                            <span
+                                className="detail-pill detail-pill--type"
+                                style={{ color: typeColor }}
+                            >
+                                {TYPE_LABELS[tx.type]}
+                            </span>
                         </div>
-                    )}
-                    {tx.splits.length > 1 && (
-                        <div className="detail-row" style={{ flexDirection: "column", gap: "var(--space-2)" }}>
-                            <span className="detail-row__label">Phân bổ</span>
-                            {tx.splits.map((s) => (
-                                <div key={s.id} style={{ display: "flex", justifyContent: "space-between", width: "100%" }}>
-                                    <span className="detail-row__value">{s.categoryName}</span>
-                                    <span className="detail-row__value" style={{ fontWeight: 600 }}>
-                                        {formatCurrency(s.amount, tx.currency)}
-                                    </span>
+
+                        {/* ── Danh mục ── */}
+                        {categoryLabel && (
+                            <div className="detail-row">
+                                <span className="detail-row__label">Danh mục</span>
+                                <span
+                                    className="detail-pill"
+                                    style={{ color: "var(--color-text-secondary)" }}
+                                >
+                                    {categoryLabel}
+                                </span>
+                            </div>
+                        )}
+
+                        {/* ── Số tiền ── */}
+                        <div className="detail-row detail-row--center">
+                            <span className="detail-row__label">Số tiền</span>
+                            <span className="detail-row__value detail-row__value--amount">
+                                {formatCurrency(tx.amount, tx.currency)}
+                            </span>
+                        </div>
+
+                        {/* ── Ngày giờ ── */}
+                        <div className="detail-row">
+                            <span className="detail-row__label">Ngày giờ</span>
+                            {editingField === "date" ? (
+                                <div className="detail-row__edit-row">
+                                    <input
+                                        className="detail-row__edit-input"
+                                        type="date"
+                                        value={tempDate}
+                                        onChange={(e) => setTempDate(e.target.value)}
+                                        max={new Date().toISOString().slice(0, 10)}
+                                        autoFocus
+                                    />
+                                    <button className="detail-row__save-btn" onClick={() => handleSave("date")} disabled={saving} type="button">
+                                        <Icon name="check" size={16} />
+                                    </button>
+                                    <button className="detail-row__cancel-btn" onClick={handleCancel} type="button">
+                                        <Icon name="close" size={16} />
+                                    </button>
                                 </div>
-                            ))}
+                            ) : (
+                                <div className="detail-row__value-row">
+                                    <span className="detail-row__value">{timeStr} – {dateStr}</span>
+                                    <button className="detail-row__edit-btn" onClick={() => setEditingField("date")} type="button" aria-label="Chỉnh sửa ngày giờ">
+                                        <Icon name="edit" size={14} className="detail-row__edit-icon" />
+                                    </button>
+                                </div>
+                            )}
                         </div>
-                    )}
-                    <div className="detail-row">
-                        <span className="detail-row__label">Mã giao dịch</span>
-                        <span className="detail-row__value detail-row__value--code">{txCode(tx.id)}</span>
+
+                        {/* ── Nội dung ── */}
+                        <div className="detail-row">
+                            <span className="detail-row__label">Nội dung</span>
+                            {editingField === "note" ? (
+                                <div className="detail-row__edit-row">
+                                    <input
+                                        className="detail-row__edit-input"
+                                        value={tempNote}
+                                        onChange={(e) => setTempNote(e.target.value)}
+                                        maxLength={500}
+                                        placeholder="Nhập nội dung..."
+                                        autoFocus
+                                    />
+                                    <button className="detail-row__save-btn" onClick={() => handleSave("note")} disabled={saving} type="button">
+                                        <Icon name="check" size={16} />
+                                    </button>
+                                    <button className="detail-row__cancel-btn" onClick={handleCancel} type="button">
+                                        <Icon name="close" size={16} />
+                                    </button>
+                                </div>
+                            ) : (
+                                <div className="detail-row__value-row">
+                                    <span className="detail-row__value">
+                                        {tx.merchantName || tx.note || "Giao dịch"}
+                                    </span>
+                                    <button className="detail-row__edit-btn" onClick={() => setEditingField("note")} type="button" aria-label="Chỉnh sửa nội dung">
+                                        <Icon name="edit" size={14} className="detail-row__edit-icon" />
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* ── Cửa hàng ── */}
+                        <div className="detail-row">
+                            <span className="detail-row__label">Cửa hàng</span>
+                            {editingField === "merchant" ? (
+                                <div className="detail-row__edit-row">
+                                    <input
+                                        className="detail-row__edit-input"
+                                        value={tempMerchant}
+                                        onChange={(e) => setTempMerchant(e.target.value)}
+                                        maxLength={200}
+                                        placeholder="Nhập tên cửa hàng..."
+                                        autoFocus
+                                    />
+                                    <button className="detail-row__save-btn" onClick={() => handleSave("merchant")} disabled={saving} type="button">
+                                        <Icon name="check" size={16} />
+                                    </button>
+                                    <button className="detail-row__cancel-btn" onClick={handleCancel} type="button">
+                                        <Icon name="close" size={16} />
+                                    </button>
+                                </div>
+                            ) : (
+                                <div className="detail-row__value-row">
+                                    <span className="detail-row__value">{tx.merchantName ?? "—"}</span>
+                                    <button className="detail-row__edit-btn" onClick={() => setEditingField("merchant")} type="button" aria-label="Chỉnh sửa cửa hàng">
+                                        <Icon name="edit" size={14} className="detail-row__edit-icon" />
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* ── Mã giao dịch ── */}
+                        <div className="detail-row">
+                            <span className="detail-row__label">Mã giao dịch</span>
+                            <span className="detail-row__value detail-row__value--code">
+                                {txCode(tx.id)}
+                            </span>
+                        </div>
+
+                        {/* ── Ảnh hóa đơn ── */}
+                        {tx.receiptImageUrl && (
+                            <div className="detail-sheet__receipt">
+                                <img src={tx.receiptImageUrl} alt="Hóa đơn" />
+                            </div>
+                        )}
                     </div>
-                    {tx.receiptImageUrl && (
-                        <div className="detail-sheet__receipt">
-                            <img src={tx.receiptImageUrl} alt="Hóa đơn" />
-                        </div>
-                    )}
                 </div>
             </div>
         </>
@@ -207,6 +382,7 @@ function DetailSheet({ tx, onClose }: { tx: TxDetail; onClose: () => void }) {
 ───────────────────────────────────────── */
 export const DashboardPage = () => {
     const { user } = useAuth();
+    const navigate = useNavigate();
     const nowDate = new Date();
 
     const [data, setData]   = useState<DashboardResponse | null>(null);
@@ -223,6 +399,7 @@ export const DashboardPage = () => {
 
     const [detailTx, setDetailTx]           = useState<TxDetail | null>(null);
     const [detailLoading, setDetailLoading] = useState(false);
+    const [showDeletedToast, setShowDeletedToast] = useState(false);
 
     /* ── Loaders ── */
     const loadDashboard = useCallback(async () => {
@@ -258,9 +435,33 @@ export const DashboardPage = () => {
         finally { setDetailLoading(false); }
     }
 
+    /* ── Delete transaction ── */
+    async function handleDeleteTx(id: string) {
+        setData((prev) =>
+            prev ? { ...prev, transactions: prev.transactions.filter((tx) => tx.transactionId !== id) } : prev,
+        );
+        setDetailTx(null);
+        try {
+            await transactionsApi.deleteTransaction(id);
+            setShowDeletedToast(true);
+            setTimeout(() => setShowDeletedToast(false), 3000);
+        } catch {
+            loadDashboard(); // restore on error
+        }
+    }
+
+    /* ── Update transaction ── */
+    async function handleUpdateTx(id: string) {
+        try {
+            const updated = await transactionsApi.getById(id);
+            setDetailTx(updated);
+            loadDashboard();
+        } catch { /* ignore */ }
+    }
+
     /* ── Derived values ── */
     const summary  = data?.summary;
-    const currency = cashflow?.currency ?? summary?.currency ?? "VND";
+    const currency = data?.displayCurrency ?? cashflow?.currency ?? summary?.currency ?? "VND";
 
     const cfIncome     = cashflow?.income     ?? 0;
     const cfExpense    = cashflow?.expense    ?? 0;
@@ -272,7 +473,7 @@ export const DashboardPage = () => {
     const expense    = summary?.expense    ?? 0;
     const investment = summary?.investment ?? 0;
     const saving     = summary?.saving     ?? 0;
-    const available  = Math.max(0, income - expense - investment - saving);
+    const available  = income - expense - investment - saving;
 
     const now = new Date();
     const isCurrentMonth = selectedYear === now.getFullYear() && selectedMonth === now.getMonth() + 1;
@@ -317,6 +518,8 @@ export const DashboardPage = () => {
         : latestTxCreatedAt
             ? getRelativeTimeLabel(latestTxCreatedAt)
             : "Chưa có giao dịch";
+
+    const recentTxs = data?.transactions.slice(0, 5) ?? [];
 
     return (
         <div className="dashboard">
@@ -456,23 +659,28 @@ export const DashboardPage = () => {
                 <section>
                     <div className="txn-section__header">
                         <span className="txn-section__title">Giao dịch gần đây</span>
-                        <button className="txn-section__see-all">Xem tất cả</button>
+                        <button
+                            className="txn-section__see-all"
+                            onClick={() => navigate("/transactions")}
+                        >
+                            Xem tất cả
+                        </button>
                     </div>
 
                     {loading ? (
-                        <div className="txn-list">
+                        <div className="dash-recent-list">
                             {[1, 2, 3].map((i) => (
-                                <div key={i} className="txn-item">
-                                    <span className="skeleton" style={{ width: 40, height: 40, borderRadius: 12, flexShrink: 0 }} />
+                                <div key={i} className="txcard txcard--skeleton">
+                                    <span className="skeleton" style={{ width: 42, height: 42, borderRadius: 12, flexShrink: 0 }} />
                                     <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 6 }}>
-                                        <span className="skeleton" style={{ width: "60%", height: 14 }} />
-                                        <span className="skeleton" style={{ width: "40%", height: 12 }} />
+                                        <span className="skeleton" style={{ width: "55%", height: 14 }} />
+                                        <span className="skeleton" style={{ width: "35%", height: 12 }} />
                                     </div>
-                                    <span className="skeleton" style={{ width: 64, height: 14 }} />
+                                    <span className="skeleton" style={{ width: 70, height: 22 }} />
                                 </div>
                             ))}
                         </div>
-                    ) : !data?.transactions.length ? (
+                    ) : recentTxs.length === 0 ? (
                         <div className="dash-empty">
                             <div className="dash-empty__icon">📭</div>
                             <div className="dash-empty__title">Chưa có giao dịch</div>
@@ -483,31 +691,34 @@ export const DashboardPage = () => {
                             </div>
                         </div>
                     ) : (
-                        <div className="txn-list">
-                            {data.transactions.map((tx: DashboardTransaction) => (
+                        <div className="dash-recent-list">
+                            {recentTxs.map((tx: DashboardTransaction) => (
                                 <div
                                     key={tx.transactionId}
-                                    className="txn-item txn-item--clickable"
+                                    className="txcard"
                                     onClick={() => openTxDetail(tx.transactionId)}
                                 >
-                                    <div className={`txn-item__icon txn-item__icon--${tx.type}`}>
+                                    <div className="txcard__icon">
                                         {tx.type === "income"     && <Icon name="trending_up"       size={20} />}
                                         {tx.type === "expense"    && <Icon name="shopping_bag"      size={20} />}
                                         {tx.type === "investment" && <Icon name="candlestick_chart" size={20} />}
                                         {tx.type === "saving"     && <Icon name="savings"           size={20} />}
                                     </div>
-                                    <div className="txn-item__body">
-                                        <div className="txn-item__name">
-                                            {tx.merchantName ?? tx.categoryName ?? "Giao dịch"}
+                                    <div className="txcard__body">
+                                        <div className={`txcard__amount txcard__amount--${tx.type}`}>
+                                            {typeSign(tx.type)}{formatCurrency(tx.amount, tx.currency)}
                                         </div>
-                                        <div className="txn-item__meta">
-                                            {formatDate(tx.transactionDate)}
-                                            {tx.splitCount > 1 && ` · ${tx.splitCount} danh mục`}
-                                            {tx.note && ` · ${tx.note}`}
+                                        <div className="txcard__desc">
+                                            {tx.merchantName || tx.note || "Giao dịch"}
                                         </div>
                                     </div>
-                                    <div className={`txn-item__amount txn-item__amount--${tx.type}`}>
-                                        {typeSign(tx.type)}{formatCurrency(tx.amount, tx.currency)}
+                                    <div className="txcard__right">
+                                        {tx.categoryName && (
+                                            <span className="txcard__cat-pill">{tx.categoryName}</span>
+                                        )}
+                                        <span className="txcard__time">
+                                            {formatTime(tx.createdAt)} – {formatDate(tx.transactionDate)}
+                                        </span>
                                     </div>
                                 </div>
                             ))}
@@ -541,7 +752,17 @@ export const DashboardPage = () => {
 
             {/* Transaction detail sheet */}
             {detailTx && !detailLoading && (
-                <DetailSheet tx={detailTx} onClose={() => setDetailTx(null)} />
+                <DetailSheet
+                    tx={detailTx}
+                    onClose={() => setDetailTx(null)}
+                    onDelete={handleDeleteTx}
+                    onUpdate={handleUpdateTx}
+                />
+            )}
+
+            {/* Deleted toast */}
+            {showDeletedToast && (
+                <div className="undo-toast">Giao dịch đã được xóa</div>
             )}
         </div>
     );

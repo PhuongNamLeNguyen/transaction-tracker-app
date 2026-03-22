@@ -1,7 +1,17 @@
-import { Resend } from "resend";
+import nodemailer from "nodemailer";
 import { env } from "../config/env";
 
-const resend = new Resend(env.resendApiKey);
+// ─── Transporter (Gmail SMTP) ──────────────────────────────────
+
+const transporter = nodemailer.createTransport({
+    host: env.smtpHost,
+    port: env.smtpPort,
+    secure: env.smtpPort === 465,
+    auth: {
+        user: env.smtpUser,
+        pass: env.smtpPass,
+    },
+});
 
 // ─── Email Templates ──────────────────────────────────────────
 
@@ -51,14 +61,36 @@ const baseHtml = (content: string) => `
 const btnStyle =
     "display:inline-block;padding:14px 32px;background:#E07B39;color:#ffffff;text-decoration:none;border-radius:8px;font-size:15px;font-weight:600;letter-spacing:-0.2px;";
 
-// ─── Send helpers ──────────────────────────────────────────────
+// ─── Send helper ───────────────────────────────────────────────
+
+async function sendEmail(payload: {
+    to: string;
+    subject: string;
+    html: string;
+    devLog: string;
+    link: string;
+}): Promise<void> {
+    try {
+        await transporter.sendMail({
+            from: `"Quản lý chi tiêu AI" <${env.fromEmail}>`,
+            to: payload.to,
+            subject: payload.subject,
+            html: payload.html,
+        });
+        console.info(`[email] ${payload.devLog} sent → ${payload.to}`);
+    } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        console.error(`[email] Failed to send ${payload.devLog}:`, message);
+        console.info(`[email] ${payload.devLog} link → ${payload.link}`);
+        throw new Error(`Failed to send email: ${message}`);
+    }
+}
 
 export const emailService = {
     sendVerificationEmail: async (to: string, name: string, rawToken: string) => {
         const link = `${env.frontendUrl}/verify-email?token=${rawToken}`;
 
-        await resend.emails.send({
-            from: env.fromEmail,
+        await sendEmail({
             to,
             subject: "Xác thực email của bạn — Quản lý chi tiêu AI",
             html: baseHtml(`
@@ -78,14 +110,15 @@ export const emailService = {
           <span style="word-break:break-all;color:#E07B39;">${link}</span>
         </p>
       `),
+            devLog: "verify-email",
+            link,
         });
     },
 
     sendPasswordResetEmail: async (to: string, name: string, rawToken: string) => {
         const link = `${env.frontendUrl}/reset-password?token=${rawToken}`;
 
-        await resend.emails.send({
-            from: env.fromEmail,
+        await sendEmail({
             to,
             subject: "Đặt lại mật khẩu — Quản lý chi tiêu AI",
             html: baseHtml(`
@@ -105,6 +138,8 @@ export const emailService = {
           <span style="word-break:break-all;color:#E07B39;">${link}</span>
         </p>
       `),
+            devLog: "reset-password",
+            link,
         });
     },
 };

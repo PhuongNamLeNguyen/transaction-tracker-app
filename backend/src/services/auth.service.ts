@@ -43,12 +43,29 @@ export const authService = {
     // Trả về { id, email } — KHÔNG trả token (phải verify email trước)
     register: async (email: string, password: string, name: string) => {
         const existing = await userRepo.findByEmail(email);
+
         if (existing) {
-            throw new AppError("Email already in use", 400, "VALIDATION_ERROR");
+            // Đã verify → báo lỗi bình thường
+            if (existing.is_verified) {
+                throw new AppError("Email already in use", 400, "VALIDATION_ERROR");
+            }
+
+            // Chưa verify → cập nhật thông tin + gửi lại email xác thực
+            const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
+            await userRepo.updateCredentials(existing.id, passwordHash, name);
+            await sessionRepo.expireAllVerificationTokens(existing.id);
+
+            const rawToken = generateRawToken();
+            const tokenHash = await bcrypt.hash(rawToken, BCRYPT_ROUNDS);
+            await sessionRepo.createVerificationToken(existing.id, tokenHash);
+
+            await emailService.sendVerificationEmail(email, name, rawToken);
+
+            return { id: existing.id, email: existing.email, name };
         }
 
         const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
-        const user = await userRepo.create(email, passwordHash, name); // ← thêm name
+        const user = await userRepo.create(email, passwordHash, name);
 
         await userRepo.createSettings(user.id);
 

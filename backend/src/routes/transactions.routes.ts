@@ -16,6 +16,7 @@ transactionsRouter.patch("/splits/restore", transactionsController.bulkRestoreSp
 transactionsRouter.get("/", transactionsController.list);
 transactionsRouter.post("/", transactionsController.create);
 transactionsRouter.get("/:id", transactionsController.getById);
+transactionsRouter.patch("/:id", transactionsController.update);
 transactionsRouter.delete("/:id", transactionsController.deleteTransaction);
 transactionsRouter.patch("/:id/restore", transactionsController.restoreTransaction);
 transactionsRouter.delete("/:id/permanent", transactionsController.hardDeleteTransaction);

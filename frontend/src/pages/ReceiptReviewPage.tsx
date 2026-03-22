@@ -53,6 +53,12 @@ function isoToDateTimeLocal(iso: string | null): string {
     return `${iso}T00:00`;
 }
 
+/** Round amount to nearest 1000 for VND, else keep as integer */
+function roundAmount(value: number, currency: string): number {
+    if (currency === "VND") return Math.round(value / 1000) * 1000;
+    return Math.round(value);
+}
+
 function formatDateTimeDisplay(dtLocal: string): string {
     if (!dtLocal) return "—";
     const [datePart, timePart = "00:00"] = dtLocal.split("T");
@@ -125,7 +131,6 @@ export const ReceiptReviewPage = () => {
             ]);
             const s = result.suggestion;
             const userCur = (
-                settingsData.preferences?.targetCurrency ??
                 settingsData.account?.currency ??
                 "VND"
             ).toUpperCase();
@@ -134,12 +139,7 @@ export const ReceiptReviewPage = () => {
             setSuggestion(s);
             setDateTime(isoToDateTimeLocal(s.transactionDate));
             setMerchant(s.merchant?.name ?? "");
-            // Auto-generate note from items or merchant
-            const itemNames = s.items.map((i) => i.itemName).filter(Boolean);
-            const autoNote = itemNames.length > 0
-                ? `Mua ${itemNames.slice(0, 3).join(", ")}`
-                : s.merchant?.name ? `Mua tại ${s.merchant.name}` : "";
-            setNote(autoNote.slice(0, 20));
+            setNote((s.suggestedNote ?? "").slice(0, 500));
             setSelectedCategoryId(s.items[0]?.prediction.categoryId ?? "");
 
             // Currency conversion
@@ -152,20 +152,20 @@ export const ReceiptReviewPage = () => {
                     const rate = await exchangeApi.getRate(receiptCur, userCur);
                     console.log("[ReceiptReview] exchange rate", receiptCur, "→", userCur, "=", rate);
                     if (rate !== null) {
-                        setAmount(String(Math.round(rawAmount * rate)));
+                        setAmount(String(roundAmount(rawAmount * rate, userCur)));
                         setConversionInfo({ original: rawAmount, from: receiptCur, rate });
                     } else {
-                        setAmount(String(rawAmount));
+                        setAmount(String(roundAmount(rawAmount, userCur)));
                         setConversionInfo(null);
                     }
                 } catch (rateErr) {
                     console.error("[ReceiptReview] exchange rate error:", rateErr);
-                    setAmount(String(rawAmount));
+                    setAmount(String(roundAmount(rawAmount, userCur)));
                     setConversionInfo(null);
                 }
             } else {
                 if (!receiptCur) console.warn("[ReceiptReview] AI returned null currency — skipping conversion");
-                setAmount(rawAmount != null ? String(rawAmount) : "");
+                setAmount(rawAmount != null ? String(roundAmount(rawAmount, userCur)) : "");
                 setConversionInfo(null);
             }
 

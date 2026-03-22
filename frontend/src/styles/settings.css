@@ -8,7 +8,7 @@
 .settings-page__title {
     font-size: var(--text-lg);
     font-weight: var(--weight-bold);
-    color: var(--color-text-primary);
+    color: var(--color-accent);
     padding: var(--space-5) var(--space-4) var(--space-3);
     text-align: center;
 }
@@ -191,6 +191,7 @@
     justify-content: center;
     font-size: 18px;
     flex-shrink: 0;
+    color: #374151;
 }
 
 .settings-row__body {

@@ -55,6 +55,12 @@ export interface TxCategory {
     type: string;
 }
 
+export interface UpdateTransactionDto {
+    note?: string | null;
+    transactionDate?: string;
+    merchantName?: string | null;
+}
+
 export interface CreateTransactionDto {
     type: TransactionType;
     amount: number;
@@ -126,6 +132,17 @@ export const transactionsApi = {
         });
         if (!res.ok) throw await res.json();
         return (await res.json()).data;
+    },
+
+    /** PATCH /transactions/:id */
+    async update(id: string, dto: UpdateTransactionDto): Promise<void> {
+        const res = await fetch(`${BASE}/transactions/${id}`, {
+            method: "PATCH",
+            headers: authHeaders(),
+            credentials: "include",
+            body: JSON.stringify(dto),
+        });
+        if (!res.ok) throw await res.json();
     },
 
     /** GET /transactions/:id */

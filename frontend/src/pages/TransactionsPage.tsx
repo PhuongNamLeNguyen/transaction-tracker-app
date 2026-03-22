@@ -6,6 +6,7 @@ import {
     type TxCategory,
     type TransactionType,
 } from "@/api/transactions.api";
+import { settingsApi } from "@/api/settings.api";
 import { BottomNav } from "@/components/common/BottomNav";
 import { Icon } from "@/components/common/Icon";
 import "@/styles/dashboard.css";
@@ -39,10 +40,10 @@ const TYPE_LABELS: Record<string, string> = {
 };
 
 const TYPE_COLORS: Record<TransactionType, string> = {
-    income:     "var(--color-income)",
-    expense:    "var(--color-expense)",
+    income: "var(--color-income)",
+    expense: "var(--color-expense)",
     investment: "var(--color-investment)",
-    saving:     "var(--color-saving)",
+    saving: "var(--color-saving)",
 };
 
 const TYPE_OPTIONS = Object.entries(TYPE_LABELS).map(([v, l]) => ({
@@ -269,20 +270,59 @@ function Calendar({
 /* ─────────────────────────────────────────
    Transaction Detail Sheet
 ───────────────────────────────────────── */
+type EditingField = "date" | "note" | "merchant" | null;
+
 function DetailSheet({
     tx,
     onClose,
     onDelete,
+    onUpdate,
+    displayCurrency,
 }: {
     tx: TxDetail;
     onClose: () => void;
     onDelete: (id: string) => void;
+    onUpdate: (id: string) => void;
+    displayCurrency: string;
 }) {
     const splits = tx.splits;
     const timeStr = formatTime(tx.createdAt);
     const dateStr = formatDateShort(tx.transactionDate);
     const typeColor = TYPE_COLORS[tx.type];
     const categoryLabel = splits.map((s) => s.categoryName).join(", ");
+
+    const [editingField, setEditingField] = useState<EditingField>(null);
+    const [tempDate, setTempDate] = useState(tx.transactionDate.slice(0, 10));
+    const [tempNote, setTempNote] = useState(tx.note ?? "");
+    const [tempMerchant, setTempMerchant] = useState(tx.merchantName ?? "");
+    const [saving, setSaving] = useState(false);
+
+    async function handleSave(field: EditingField) {
+        if (!field || saving) return;
+        setSaving(true);
+        try {
+            const dto =
+                field === "date"
+                    ? { transactionDate: tempDate }
+                    : field === "note"
+                      ? { note: tempNote || null }
+                      : { merchantName: tempMerchant || null };
+            await transactionsApi.update(tx.id, dto);
+            onUpdate(tx.id);
+            setEditingField(null);
+        } catch {
+            // keep editing open on error
+        } finally {
+            setSaving(false);
+        }
+    }
+
+    function handleCancel() {
+        setTempDate(tx.transactionDate.slice(0, 10));
+        setTempNote(tx.note ?? "");
+        setTempMerchant(tx.merchantName ?? "");
+        setEditingField(null);
+    }
 
     return (
         <>
@@ -311,7 +351,6 @@ function DetailSheet({
 
                 <div className="detail-sheet__scroll">
                     <div className="detail-sheet__body">
-
                         {/* ── Loại ── */}
                         <div className="detail-row">
                             <span className="detail-row__label">Loại</span>
@@ -326,10 +365,14 @@ function DetailSheet({
                         {/* ── Danh mục ── */}
                         {categoryLabel && (
                             <div className="detail-row">
-                                <span className="detail-row__label">Danh mục</span>
+                                <span className="detail-row__label">
+                                    Danh mục
+                                </span>
                                 <span
                                     className="detail-pill"
-                                    style={{ color: "var(--color-text-secondary)" }}
+                                    style={{
+                                        color: "var(--color-text-secondary)",
+                                    }}
                                 >
                                     {categoryLabel}
                                 </span>
@@ -337,47 +380,178 @@ function DetailSheet({
                         )}
 
                         {/* ── Số tiền ── */}
-                        <div className="detail-row">
+                        <div className="detail-row detail-row--center">
                             <span className="detail-row__label">Số tiền</span>
                             <span className="detail-row__value detail-row__value--amount">
-                                {formatCurrency(tx.amount, tx.currency)}
+                                {formatCurrency(tx.amount, displayCurrency)}
                             </span>
                         </div>
 
                         {/* ── Ngày giờ ── */}
                         <div className="detail-row">
                             <span className="detail-row__label">Ngày giờ</span>
-                            <div className="detail-row__value-row">
-                                <span className="detail-row__value">
-                                    {timeStr} – {dateStr}
-                                </span>
-                                <Icon name="edit" size={14} className="detail-row__edit-icon" />
-                            </div>
+                            {editingField === "date" ? (
+                                <div className="detail-row__edit-row">
+                                    <input
+                                        className="detail-row__edit-input"
+                                        type="date"
+                                        value={tempDate}
+                                        onChange={(e) =>
+                                            setTempDate(e.target.value)
+                                        }
+                                        max={new Date()
+                                            .toISOString()
+                                            .slice(0, 10)}
+                                        autoFocus
+                                    />
+                                    <button
+                                        className="detail-row__save-btn"
+                                        onClick={() => handleSave("date")}
+                                        disabled={saving}
+                                        type="button"
+                                    >
+                                        <Icon name="check" size={16} />
+                                    </button>
+                                    <button
+                                        className="detail-row__cancel-btn"
+                                        onClick={handleCancel}
+                                        type="button"
+                                    >
+                                        <Icon name="close" size={16} />
+                                    </button>
+                                </div>
+                            ) : (
+                                <div className="detail-row__value-row">
+                                    <span className="detail-row__value">
+                                        {timeStr} – {dateStr}
+                                    </span>
+                                    <button
+                                        className="detail-row__edit-btn"
+                                        onClick={() => setEditingField("date")}
+                                        type="button"
+                                        aria-label="Chỉnh sửa ngày giờ"
+                                    >
+                                        <Icon
+                                            name="edit"
+                                            size={14}
+                                            className="detail-row__edit-icon"
+                                        />
+                                    </button>
+                                </div>
+                            )}
                         </div>
 
                         {/* ── Nội dung ── */}
                         <div className="detail-row">
                             <span className="detail-row__label">Nội dung</span>
-                            <div className="detail-row__value-row">
-                                <span className="detail-row__value">{txLabel(tx)}</span>
-                                <Icon name="edit" size={14} className="detail-row__edit-icon" />
-                            </div>
+                            {editingField === "note" ? (
+                                <div className="detail-row__edit-row">
+                                    <input
+                                        className="detail-row__edit-input"
+                                        value={tempNote}
+                                        onChange={(e) =>
+                                            setTempNote(e.target.value)
+                                        }
+                                        maxLength={500}
+                                        placeholder="Nhập nội dung..."
+                                        autoFocus
+                                    />
+                                    <button
+                                        className="detail-row__save-btn"
+                                        onClick={() => handleSave("note")}
+                                        disabled={saving}
+                                        type="button"
+                                    >
+                                        <Icon name="check" size={16} />
+                                    </button>
+                                    <button
+                                        className="detail-row__cancel-btn"
+                                        onClick={handleCancel}
+                                        type="button"
+                                    >
+                                        <Icon name="close" size={16} />
+                                    </button>
+                                </div>
+                            ) : (
+                                <div className="detail-row__value-row">
+                                    <span className="detail-row__value">
+                                        {txLabel(tx)}
+                                    </span>
+                                    <button
+                                        className="detail-row__edit-btn"
+                                        onClick={() => setEditingField("note")}
+                                        type="button"
+                                        aria-label="Chỉnh sửa nội dung"
+                                    >
+                                        <Icon
+                                            name="edit"
+                                            size={14}
+                                            className="detail-row__edit-icon"
+                                        />
+                                    </button>
+                                </div>
+                            )}
                         </div>
 
                         {/* ── Cửa hàng ── */}
-                        {tx.merchantName && (
-                            <div className="detail-row">
-                                <span className="detail-row__label">Cửa hàng</span>
-                                <div className="detail-row__value-row">
-                                    <span className="detail-row__value">{tx.merchantName}</span>
-                                    <Icon name="edit" size={14} className="detail-row__edit-icon" />
+                        <div className="detail-row">
+                            <span className="detail-row__label">Cửa hàng</span>
+                            {editingField === "merchant" ? (
+                                <div className="detail-row__edit-row">
+                                    <input
+                                        className="detail-row__edit-input"
+                                        value={tempMerchant}
+                                        onChange={(e) =>
+                                            setTempMerchant(e.target.value)
+                                        }
+                                        maxLength={200}
+                                        placeholder="Nhập tên cửa hàng..."
+                                        autoFocus
+                                    />
+                                    <button
+                                        className="detail-row__save-btn"
+                                        onClick={() => handleSave("merchant")}
+                                        disabled={saving}
+                                        type="button"
+                                    >
+                                        <Icon name="check" size={16} />
+                                    </button>
+                                    <button
+                                        className="detail-row__cancel-btn"
+                                        onClick={handleCancel}
+                                        type="button"
+                                    >
+                                        <Icon name="close" size={16} />
+                                    </button>
                                 </div>
-                            </div>
-                        )}
+                            ) : (
+                                <div className="detail-row__value-row">
+                                    <span className="detail-row__value">
+                                        {tx.merchantName ?? "—"}
+                                    </span>
+                                    <button
+                                        className="detail-row__edit-btn"
+                                        onClick={() =>
+                                            setEditingField("merchant")
+                                        }
+                                        type="button"
+                                        aria-label="Chỉnh sửa cửa hàng"
+                                    >
+                                        <Icon
+                                            name="edit"
+                                            size={14}
+                                            className="detail-row__edit-icon"
+                                        />
+                                    </button>
+                                </div>
+                            )}
+                        </div>
 
                         {/* ── Mã giao dịch ── */}
                         <div className="detail-row">
-                            <span className="detail-row__label">Mã giao dịch</span>
+                            <span className="detail-row__label">
+                                Mã giao dịch
+                            </span>
                             <span className="detail-row__value detail-row__value--code">
                                 {txCode(tx.id)}
                             </span>
@@ -467,6 +641,7 @@ export const TransactionsPage = () => {
     const [showCal, setShowCal] = useState(true);
     const [selectedDate, setSelectedDate] = useState<string | null>(null);
 
+    const [displayCurrency, setDisplayCurrency] = useState("VND");
     const [transactions, setTransactions] = useState<TxListItem[]>([]);
     const [categories, setCategories] = useState<TxCategory[]>([]);
     const [loading, setLoading] = useState(true);
@@ -496,6 +671,17 @@ export const TransactionsPage = () => {
     useEffect(() => {
         if (year == null || month == null) setSelectedDate(null);
     }, [year, month]);
+
+    /* ── Fetch display currency from settings ── */
+    useEffect(() => {
+        settingsApi
+            .getSettings()
+            .then((s) => {
+                if (s.preferences?.targetCurrency)
+                    setDisplayCurrency(s.preferences.targetCurrency);
+            })
+            .catch(() => {});
+    }, []);
 
     /* ── Fetch transactions ── */
     const load = useCallback(async () => {
@@ -546,6 +732,24 @@ export const TransactionsPage = () => {
             /* ignore */
         } finally {
             setDetailLoading(false);
+        }
+    }
+
+    /* ── Update transaction (refresh detail + list) ── */
+    async function handleUpdateTx(id: string) {
+        try {
+            const [updatedDetail, updatedList] = await Promise.all([
+                transactionsApi.getById(id),
+                transactionsApi.list({
+                    year: year ?? undefined,
+                    month: month === null ? undefined : month,
+                    type: selectedType === "all" ? undefined : selectedType,
+                }),
+            ]);
+            setDetailTx(updatedDetail);
+            setTransactions(updatedList);
+        } catch {
+            /* ignore */
         }
     }
 
@@ -834,6 +1038,8 @@ export const TransactionsPage = () => {
                     tx={detailTx}
                     onClose={() => setDetailTx(null)}
                     onDelete={handleDeleteTx}
+                    onUpdate={handleUpdateTx}
+                    displayCurrency={displayCurrency}
                 />
             )}
 

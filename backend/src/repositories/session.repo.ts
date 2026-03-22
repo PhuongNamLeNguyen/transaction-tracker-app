@@ -103,6 +103,13 @@ export const sessionRepo = {
         );
     },
 
+    expireAllVerificationTokens: async (userId: string) => {
+        await query(
+            `UPDATE verification_tokens SET expired_at = now() WHERE user_id = $1`,
+            [userId],
+        );
+    },
+
     findVerificationTokenByHash: async (rawToken: string) => {
         // Lấy tất cả token còn hạn, rồi so sánh bcrypt từng cái
         const result = await query(

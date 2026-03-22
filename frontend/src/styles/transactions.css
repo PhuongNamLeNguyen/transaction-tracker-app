@@ -19,7 +19,7 @@
 .txpage__title {
     font-size: var(--text-lg);
     font-weight: var(--weight-bold);
-    color: var(--color-text-primary);
+    color: var(--color-accent);
     margin-bottom: var(--space-3);
     text-align: center;
 }
@@ -83,8 +83,8 @@
     cursor: pointer;
     padding: var(--space-2) 0 var(--space-3);
     font-size: var(--text-sm);
-    font-weight: var(--weight-medium);
-    color: var(--color-text-secondary);
+    font-weight: var(--weight-bold);
+    color: var(--color-accent);
     width: 100%;
 }
 
@@ -232,8 +232,8 @@
 /* ── Day Group ── */
 .txgroup__header {
     font-size: var(--text-sm);
-    font-weight: var(--weight-semibold);
-    color: var(--color-text-secondary);
+    font-weight: var(--weight-bold);
+    color: var(--color-accent);
     margin-bottom: var(--space-2);
     padding-left: var(--space-1);
 }
@@ -484,6 +484,10 @@
     border-bottom: none;
 }
 
+.detail-row--center {
+    align-items: center;
+}
+
 .detail-row__label {
     font-size: var(--text-sm);
     font-weight: var(--weight-semibold);
@@ -539,6 +543,54 @@
     color: var(--color-text-tertiary);
     flex-shrink: 0;
 }
+.detail-row__edit-btn {
+    background: none;
+    border: none;
+    padding: 2px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    color: var(--color-text-tertiary);
+    flex-shrink: 0;
+    border-radius: var(--radius-sm);
+}
+.detail-row__edit-btn:active { background: var(--color-border); }
+
+/* ── Inline edit mode ── */
+.detail-row__edit-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    flex: 1;
+    justify-content: flex-end;
+}
+.detail-row__edit-input {
+    flex: 1;
+    min-width: 0;
+    background: var(--color-surface-raised);
+    border: 1.5px solid var(--color-accent);
+    border-radius: var(--radius-md);
+    padding: var(--space-1) var(--space-2);
+    font-size: var(--text-sm);
+    color: var(--color-text-primary);
+    font-family: var(--font-sans);
+    text-align: right;
+    outline: none;
+}
+.detail-row__save-btn,
+.detail-row__cancel-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 4px;
+    display: flex;
+    align-items: center;
+    border-radius: var(--radius-sm);
+    flex-shrink: 0;
+}
+.detail-row__save-btn { color: var(--color-income); }
+.detail-row__cancel-btn { color: var(--color-text-tertiary); }
+.detail-row__save-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
 .detail-sheet__receipt {
     margin-top: var(--space-4);

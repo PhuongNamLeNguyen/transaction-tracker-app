@@ -33,6 +33,13 @@ export const userRepo = {
         ]);
     },
 
+    updateCredentials: async (userId: string, passwordHash: string, name: string) => {
+        await query(
+            `UPDATE users SET password_hash = $2, name = $3, updated_at = now() WHERE id = $1`,
+            [userId, passwordHash, name],
+        );
+    },
+
     setVerified: async (userId: string) => {
         await query(
             `UPDATE users SET is_verified = true, updated_at = now()

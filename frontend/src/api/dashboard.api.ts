@@ -71,6 +71,7 @@ export interface DashboardResponse {
     categoryBreakdown: CategoryBreakdown;
     planProgress: PlanProgressItem[];
     transactions: DashboardTransaction[];
+    displayCurrency: string;
 }
 
 export interface ExpenseBreakdownItem {

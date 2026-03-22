@@ -15,7 +15,7 @@
 .plan-page__title {
     font-size: var(--text-lg);
     font-weight: var(--weight-bold);
-    color: var(--color-text-primary);
+    color: var(--color-accent);
 }
 
 .plan-page__edit-btn {
@@ -144,6 +144,7 @@
     height: 38px;
     border-radius: var(--radius-md);
     background: var(--color-expense-bg);
+    color: #374151;
     display: flex;
     align-items: center;
     justify-content: center;

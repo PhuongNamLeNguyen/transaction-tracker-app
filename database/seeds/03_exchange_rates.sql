@@ -56,10 +56,38 @@ INSERT INTO exchange_rates (base_currency, target_currency, rate, updated_at) VA
   ('GBP', 'JPY', 189.00,   now()),
 
   -- ── common cross-rates ────────────────────────────────────────────────────
-  -- 1 USD = x VND  (most-used pair for Vietnamese users)
-  ('USD', 'VND', 25300.00, now()),
+  -- 1 USD = x VND
+  ('USD', 'VND', 25300.00,       now()),
   -- 1 VND = x USD
-  ('VND', 'USD', 0.0000395, now())
+  ('VND', 'USD', 0.0000395,      now()),
+  -- 1 EUR = x VND
+  ('EUR', 'VND', 27500.00,       now()),
+  -- 1 VND = x EUR
+  ('VND', 'EUR', 0.0000364,      now()),
+  -- 1 GBP = x VND
+  ('GBP', 'VND', 32000.00,       now()),
+  -- 1 VND = x GBP
+  ('VND', 'GBP', 0.0000313,      now()),
+  -- 1 SGD = x VND
+  ('SGD', 'VND', 18900.00,       now()),
+  -- 1 VND = x SGD
+  ('VND', 'SGD', 0.0000529,      now()),
+  -- 1 THB = x VND
+  ('THB', 'VND', 700.00,         now()),
+  -- 1 VND = x THB
+  ('VND', 'THB', 0.00143,        now()),
+  -- 1 KRW = x VND
+  ('KRW', 'VND', 18.00,          now()),
+  -- 1 VND = x KRW
+  ('VND', 'KRW', 0.0556,         now()),
+  -- 1 CNY = x VND
+  ('CNY', 'VND', 3500.00,        now()),
+  -- 1 VND = x CNY
+  ('VND', 'CNY', 0.000286,       now()),
+  -- 1 AUD = x VND
+  ('AUD', 'VND', 16000.00,       now()),
+  -- 1 VND = x AUD
+  ('VND', 'AUD', 0.0000625,      now())
 
 ON CONFLICT (base_currency, target_currency)
 DO UPDATE SET

@@ -81,6 +81,7 @@ async function runExtraction(
         currency: receiptData.currency,
         taxAmount: receiptData.taxAmount,
         discountAmount: receiptData.discountAmount,
+        suggestedNote: receiptData.suggestedNote ?? null,
         items: itemResults,
     };
 

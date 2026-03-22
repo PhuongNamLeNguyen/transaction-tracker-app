@@ -4,6 +4,20 @@ import { asyncHandler } from "../utils/asyncHandler";
 import { sendSuccess } from "../utils/response";
 import { AppError } from "../utils/AppError";
 import { transactionsRepo } from "../repositories/transactions.repo";
+import { dashboardRepo } from "../repositories/dashboard.repo";
+import { exchangeRepo } from "../repositories/exchange.repo";
+
+async function getDisplayRate(userId: string): Promise<{ displayCurrency: string; rate: number }> {
+    const displayCurrency = await dashboardRepo.getDisplayCurrency(userId);
+    if (displayCurrency === "VND") return { displayCurrency, rate: 1 };
+    const rate = await exchangeRepo.getRate("VND", displayCurrency);
+    return { displayCurrency, rate: rate ?? 1 };
+}
+
+function conv(amount: number, rate: number): number {
+    if (rate === 1) return amount;
+    return parseFloat((amount * rate).toFixed(2));
+}
 
 const createManualSchema = z.object({
     type: z.enum(["income", "expense", "investment", "saving"]),
@@ -38,13 +52,16 @@ export const transactionsController = {
         if (month != null && (month < 1 || month > 12))
             throw new AppError("Invalid month", 400, "VALIDATION_ERROR");
 
-        const rows = await transactionsRepo.list(userId, year, month, type, categoryId);
+        const [rows, { displayCurrency, rate }] = await Promise.all([
+            transactionsRepo.list(userId, year, month, type, categoryId),
+            getDisplayRate(userId),
+        ]);
 
         const transactions = rows.map((row) => ({
             id: row.id,
             type: row.type,
-            amount: Number(row.amount),
-            currency: row.currency,
+            amount: conv(Number(row.amount), rate),
+            currency: displayCurrency,
             transactionDate: row.transaction_date,
             createdAt: row.created_at,
             note: row.note ?? null,
@@ -73,6 +90,25 @@ export const transactionsController = {
         }));
 
         sendSuccess(res, categories);
+    }),
+
+    /** PATCH /transactions/:id — update note, transactionDate, merchantName */
+    update: asyncHandler(async (req: Request, res: Response) => {
+        const userId = req.user!.id;
+        const { id } = req.params;
+
+        const schema = z.object({
+            note:            z.string().max(500).nullable().optional(),
+            transactionDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+            merchantName:    z.string().max(200).nullable().optional(),
+        }).refine((d) => Object.keys(d).length > 0, { message: "Nothing to update" });
+
+        const parsed = schema.safeParse(req.body);
+        if (!parsed.success)
+            throw new AppError(parsed.error.issues[0]?.message ?? "Invalid input", 400, "VALIDATION_ERROR");
+
+        await transactionsRepo.updateTransaction(userId, id, parsed.data);
+        sendSuccess(res, { updated: true });
     }),
 
     /** POST /transactions — supports manual entry and receipt_scan */
@@ -272,14 +308,17 @@ export const transactionsController = {
         const userId = req.user!.id;
         const { id } = req.params;
 
-        const tx = await transactionsRepo.getById(userId, String(id));
+        const [tx, { displayCurrency, rate }] = await Promise.all([
+            transactionsRepo.getById(userId, String(id)),
+            getDisplayRate(userId),
+        ]);
         if (!tx) throw new AppError("Transaction not found", 404, "RESOURCE_NOT_FOUND");
 
         sendSuccess(res, {
             id: tx.id,
             type: tx.type,
-            amount: Number(tx.amount),
-            currency: tx.currency,
+            amount: conv(Number(tx.amount), rate),
+            currency: displayCurrency,
             transactionDate: tx.transaction_date,
             createdAt: tx.created_at,
             note: tx.note ?? null,
@@ -288,7 +327,7 @@ export const transactionsController = {
             receiptImageUrl: tx.receipt_image_url ?? null,
             splits: tx.splits.map((s: Record<string, unknown>) => ({
                 id: s.id,
-                amount: Number(s.amount),
+                amount: conv(Number(s.amount), rate),
                 categoryId: s.category_id,
                 categoryName: s.category_name,
                 categoryIcon: s.category_icon,

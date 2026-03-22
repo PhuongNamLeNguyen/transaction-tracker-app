@@ -7,11 +7,18 @@ import { env } from "../config/env";
 import { AppError } from "../utils/AppError";
 
 const REFRESH_COOKIE_NAME = "refresh_token";
-const COOKIE_OPTIONS = {
+const isProd = process.env.NODE_ENV === "production";
+
+// Cross-domain (Vercel frontend ↔ Railway backend) requires sameSite:"none" + secure:true
+const baseCookieOptions = {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax" as const,
+    secure: isProd,
+    sameSite: (isProd ? "none" : "lax") as "none" | "lax",
     path: "/",
+};
+
+const COOKIE_OPTIONS = {
+    ...baseCookieOptions,
     maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
 };
 
@@ -49,10 +56,7 @@ export const authController = {
         );
 
         const cookieOptions = {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === "production",
-            sameSite: "lax" as const,
-            path: "/",
+            ...baseCookieOptions,
             ...(result.rememberMe ? { maxAge: 30 * 24 * 60 * 60 * 1000 } : {}),
         };
 
@@ -135,15 +139,7 @@ export const authController = {
                 req.ip,
             );
 
-            const cookieOptions = {
-                httpOnly: true,
-                secure: process.env.NODE_ENV === "production",
-                sameSite: "lax" as const,
-                path: "/",
-                maxAge: 30 * 24 * 60 * 60 * 1000,
-            };
-
-            res.cookie("refresh_token", result.refreshToken, cookieOptions);
+            res.cookie("refresh_token", result.refreshToken, COOKIE_OPTIONS);
 
             const userEncoded = Buffer.from(JSON.stringify(result.user)).toString("base64url");
             res.redirect(

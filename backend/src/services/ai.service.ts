@@ -26,6 +26,7 @@ export interface AiReceiptData {
     currency: string | null;
     taxAmount: number | null;
     discountAmount: number | null;
+    suggestedNote: string | null;
     items: AiReceiptItem[];
 }
 
@@ -107,6 +108,7 @@ Return ONLY valid JSON with this exact structure (no markdown, no extra text):
   "currency": "ISO 4217 three-letter code ONLY (e.g. JPY, VND, USD, KRW, EUR, GBP, CNY, THB, SGD). Never use symbols like ¥ or $. Infer from receipt language/country if not printed. null only if truly unknown.",
   "taxAmount": <number or null>,
   "discountAmount": <number or null>,
+  "suggestedNote": "short activity description in the receipt's language (1–5 words, describes what the person DID, not what they bought). Examples: a BBQ restaurant → 'Ăn thịt nướng'; a transit card top-up receipt → 'Nạp thẻ tàu'; a gas station → 'Đổ xăng'; a coffee shop → 'Uống cà phê'; a supermarket → 'Mua sắm siêu thị'. Do NOT use generic 'Mua X' for services or dining.",
   "items": [
     {
       "itemName": "item name",
@@ -126,7 +128,8 @@ Rules:
 - confidenceScore 0.30-0.69: weak/fallback match
 - confidenceScore < 0.30: no match, set predictedCategoryId and predictedCategoryName to null
 - If no items are visible, set items to []
-- Never invent values not visible on the receipt`;
+- Never invent values not visible on the receipt
+- suggestedNote must reflect the activity (eating, topping up, fueling, shopping) inferred from merchant type and items — not a literal item list`;
 
     const contentBlocks: Anthropic.MessageParam["content"] = [];
 

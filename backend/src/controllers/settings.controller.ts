@@ -48,13 +48,19 @@ export const settingsController = {
             return sendSuccess(res, { updated: false });
         }
 
+        const parsedCycleStartDay = cycleStartDay !== undefined ? Number(cycleStartDay) : undefined;
+
         await settingsRepo.updateSettings(userId, {
-            ...(theme            !== undefined && { theme }),
-            ...(targetCurrency   !== undefined && { targetCurrency }),
-            ...(cycleStartDay    !== undefined && { cycleStartDay: Number(cycleStartDay) }),
-            ...(systemLanguage   !== undefined && { systemLanguage }),
-            ...(timeZone         !== undefined && { timeZone }),
+            ...(theme                 !== undefined && { theme }),
+            ...(targetCurrency        !== undefined && { targetCurrency }),
+            ...(parsedCycleStartDay   !== undefined && { cycleStartDay: parsedCycleStartDay }),
+            ...(systemLanguage        !== undefined && { systemLanguage }),
+            ...(timeZone              !== undefined && { timeZone }),
         });
+
+        if (parsedCycleStartDay !== undefined) {
+            await settingsRepo.updateMostRecentPeriodDates(userId, parsedCycleStartDay);
+        }
 
         sendSuccess(res, { updated: true });
     }),

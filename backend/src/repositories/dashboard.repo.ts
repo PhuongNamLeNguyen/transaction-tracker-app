@@ -81,20 +81,30 @@ export const dashboardRepo = {
              FROM   budgets b
              JOIN   budget_periods bp ON bp.id = b.period_id AND bp.id = $2
              JOIN   categories c      ON b.category_id = c.id
-             LEFT JOIN transaction_splits ts
-               ON ts.category_id = c.id AND ts.deleted_at IS NULL
              LEFT JOIN transactions t
-               ON ts.transaction_id = t.id
-               AND t.user_id         = $1
+               ON t.user_id         = $1
                AND t.type            = 'expense'
                AND t.status          = 'confirmed'
                AND t.deleted_at      IS NULL
                AND t.transaction_date BETWEEN bp.start_date AND bp.end_date
+             LEFT JOIN transaction_splits ts
+               ON ts.transaction_id = t.id
+               AND ts.category_id   = c.id
+               AND ts.deleted_at    IS NULL
              GROUP BY c.id, c.name, c.icon, b.amount, b.currency
              ORDER BY COALESCE(SUM(ts.amount), 0) / NULLIF(b.amount, 0) DESC NULLS LAST`,
             [userId, periodId],
         );
         return result.rows;
+    },
+
+    /* ─── User's preferred display currency ─── */
+    getDisplayCurrency: async (userId: string): Promise<string> => {
+        const result = await query(
+            `SELECT target_currency FROM user_settings WHERE user_id = $1 LIMIT 1`,
+            [userId],
+        );
+        return (result.rows[0]?.target_currency as string) ?? "VND";
     },
 
     /* ─── Expense category breakdown for a calendar month ─── */

@@ -43,6 +43,7 @@ export interface TransactionSuggestion {
     currency: string | null;
     taxAmount: number | null;
     discountAmount: number | null;
+    suggestedNote: string | null;
     items: SuggestionItem[];
 }
 

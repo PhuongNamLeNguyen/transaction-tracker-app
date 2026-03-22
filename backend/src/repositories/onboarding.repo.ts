@@ -95,7 +95,8 @@ export const onboardingRepo = {
             cycleStartDay - 1,
         );
 
-        const fmt = (d: Date) => d.toISOString().split("T")[0];
+        const fmt = (d: Date) =>
+            `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
         const result = await query(
             `INSERT INTO budget_periods (user_id, start_date, end_date)

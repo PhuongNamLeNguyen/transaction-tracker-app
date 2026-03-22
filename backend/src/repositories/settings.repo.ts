@@ -1,5 +1,24 @@
 import { query } from "../db/client";
 
+function calcPeriodDates(cycleStartDay: number): { startDate: string; endDate: string } {
+    const today = new Date();
+    const todayDay = today.getDate();
+
+    let startDate: Date;
+    if (cycleStartDay <= todayDay) {
+        startDate = new Date(today.getFullYear(), today.getMonth(), cycleStartDay);
+    } else {
+        startDate = new Date(today.getFullYear(), today.getMonth() - 1, cycleStartDay);
+    }
+
+    // end_date = start_date + 1 month - 1 day
+    const endDate = new Date(startDate.getFullYear(), startDate.getMonth() + 1, cycleStartDay - 1);
+
+    const fmt = (d: Date) =>
+        `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    return { startDate: fmt(startDate), endDate: fmt(endDate) };
+}
+
 export const settingsRepo = {
     /* ─── Get preferences + account ─── */
     getSettings: async (userId: string) => {
@@ -73,6 +92,22 @@ export const settingsRepo = {
         await query(
             `UPDATE user_settings SET ${sets.join(", ")} WHERE user_id = $1`,
             values,
+        );
+    },
+
+    /* ─── Recalculate the most recent budget period dates for a new cycleStartDay ─── */
+    updateMostRecentPeriodDates: async (userId: string, cycleStartDay: number) => {
+        const { startDate, endDate } = calcPeriodDates(cycleStartDay);
+        await query(
+            `UPDATE budget_periods
+             SET    start_date = $2, end_date = $3
+             WHERE  id = (
+                 SELECT id FROM budget_periods
+                 WHERE  user_id = $1
+                 ORDER  BY start_date DESC
+                 LIMIT  1
+             )`,
+            [userId, startDate, endDate],
         );
     },
 };

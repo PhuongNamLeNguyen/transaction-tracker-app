@@ -152,12 +152,8 @@ export const transactionsRepo = {
         );
         if (existing.rows[0]) return existing.rows[0];
 
-        // No account yet — derive currency from user_settings, default to VND
-        const settings = await query(
-            `SELECT target_currency FROM user_settings WHERE user_id = $1 LIMIT 1`,
-            [userId],
-        );
-        const currency = settings.rows[0]?.target_currency ?? "VND";
+        // No account yet — always create in VND (targetCurrency is display-only)
+        const currency = "VND";
 
         const created = await query(
             `INSERT INTO accounts (user_id, name, type, currency, balance)
@@ -216,6 +212,51 @@ export const transactionsRepo = {
             throw err;
         } finally {
             client.release();
+        }
+    },
+
+    /* ─── Update editable fields: note, transactionDate, merchantName ─── */
+    updateTransaction: async (
+        userId: string,
+        id: string,
+        data: { note?: string | null; transactionDate?: string; merchantName?: string | null },
+    ) => {
+        const setClauses: string[] = ["updated_at = now()"];
+        const values: unknown[] = [id, userId];
+        let idx = 3;
+
+        if ("note" in data) {
+            setClauses.push(`note = $${idx++}`);
+            values.push(data.note ?? null);
+        }
+        if ("transactionDate" in data && data.transactionDate) {
+            setClauses.push(`transaction_date = $${idx++}`);
+            values.push(data.transactionDate);
+        }
+
+        await query(
+            `UPDATE transactions SET ${setClauses.join(", ")}
+             WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL`,
+            values,
+        );
+
+        if ("merchantName" in data) {
+            if (!data.merchantName) {
+                await query(
+                    `UPDATE transactions SET merchant_id = NULL WHERE id = $1 AND user_id = $2`,
+                    [id, userId],
+                );
+            } else {
+                const normalized = data.merchantName.toLowerCase().trim();
+                const merchant = await query(
+                    `INSERT INTO merchants (name, normalized_name) VALUES ($1, $2) RETURNING id`,
+                    [data.merchantName, normalized],
+                );
+                await query(
+                    `UPDATE transactions SET merchant_id = $1 WHERE id = $2 AND user_id = $3`,
+                    [merchant.rows[0].id, id, userId],
+                );
+            }
         }
     },
 

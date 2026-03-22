@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
     transactionsApi,
@@ -6,8 +6,10 @@ import {
     type TxCategory,
 } from "@/api/transactions.api";
 import { settingsApi } from "@/api/settings.api";
+import { exchangeApi } from "@/api/exchange.api";
 import { Icon } from "@/components/common/Icon";
 import "@/styles/add-transaction.css";
+import "@/styles/transactions.css";
 
 /* ─── Config ─── */
 const TYPE_CONFIG: Record<
@@ -30,6 +32,29 @@ function todayIso(): string {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
+/* ─── Date picker helpers ─── */
+const VIET_MONTHS = [
+    "Tháng 1","Tháng 2","Tháng 3","Tháng 4","Tháng 5","Tháng 6",
+    "Tháng 7","Tháng 8","Tháng 9","Tháng 10","Tháng 11","Tháng 12",
+];
+const DAY_LABELS = ["H","B","T","N","S","B","C"]; // Mon → Sun
+
+function isoToDisplay(iso: string): string {
+    if (!iso) return "";
+    const [y, m, d] = iso.split("-");
+    return `${d}/${m}/${y}`;
+}
+
+function getDaysInMonth(year: number, month: number): number {
+    return new Date(year, month, 0).getDate();
+}
+
+/** Returns 0=Mon … 6=Sun offset for the 1st of the month */
+function getFirstWeekday(year: number, month: number): number {
+    const day = new Date(year, month - 1, 1).getDay(); // 0=Sun
+    return day === 0 ? 6 : day - 1;
+}
+
 /* ─── Page ─── */
 export const AddTransactionPage = () => {
     const navigate = useNavigate();
@@ -48,10 +73,22 @@ export const AddTransactionPage = () => {
     const [error, setError]                   = useState<string | null>(null);
     const [success, setSuccess]               = useState(false);
     const [accountCurrency, setAccountCurrency] = useState("VND");
+    const [toVndRate, setToVndRate]           = useState(1); // rate: 1 unit of displayCurrency → VND
+    const [catOpen, setCatOpen]               = useState(false);
+    const [catAnchorRect, setCatAnchorRect]   = useState<DOMRect | null>(null);
+    const catFieldRef                         = useRef<HTMLDivElement>(null);
+    const [dateOpen, setDateOpen]             = useState(false);
+    const [calYear, setCalYear]               = useState(() => new Date().getFullYear());
+    const [calMonth, setCalMonth]             = useState(() => new Date().getMonth() + 1);
 
     useEffect(() => {
-        settingsApi.getSettings().then((s) => {
-            if (s.account?.currency) setAccountCurrency(s.account.currency);
+        settingsApi.getSettings().then(async (s) => {
+            const cur = s.preferences?.targetCurrency ?? s.account?.currency ?? "VND";
+            setAccountCurrency(cur);
+            if (cur !== "VND") {
+                const rate = await exchangeApi.getRate(cur, "VND").catch(() => null);
+                setToVndRate(rate ?? 1);
+            }
         }).catch(() => {});
     }, []);
 
@@ -76,6 +113,30 @@ export const AddTransactionPage = () => {
     const cfg = TYPE_CONFIG[type];
     const currencyLabel = accountCurrency === "VND" ? "đ" : accountCurrency;
 
+    /* ─── Calendar helpers ─── */
+    const todayStr = todayIso();
+    const nowDate  = new Date();
+    const isNextMonthDisabled =
+        calYear > nowDate.getFullYear() ||
+        (calYear === nowDate.getFullYear() && calMonth >= nowDate.getMonth() + 1);
+
+    function openCalendar() {
+        const parts = date.split("-").map(Number);
+        setCalYear(parts[0] || nowDate.getFullYear());
+        setCalMonth(parts[1] || nowDate.getMonth() + 1);
+        setDateOpen(true);
+    }
+
+    function prevMonth() {
+        if (calMonth === 1) { setCalYear(y => y - 1); setCalMonth(12); }
+        else setCalMonth(m => m - 1);
+    }
+
+    function nextMonth() {
+        if (calMonth === 12) { setCalYear(y => y + 1); setCalMonth(1); }
+        else setCalMonth(m => m + 1);
+    }
+
     async function handleSubmit(e: React.FormEvent) {
         e.preventDefault();
         if (!isValid || saving) return;
@@ -83,9 +144,11 @@ export const AddTransactionPage = () => {
         setSaving(true);
         setError(null);
         try {
+            // Convert from display currency to VND before storing
+            const amountInVnd = Math.round(parsedAmount * toVndRate);
             await transactionsApi.create({
                 type,
-                amount: parsedAmount,
+                amount: amountInVnd,
                 transactionDate: date,
                 categoryId: selectedCatId!,
                 note: note.trim() || undefined,
@@ -123,11 +186,12 @@ export const AddTransactionPage = () => {
                             <button
                                 key={t}
                                 type="button"
-                                className={`atx-type-tab${type === t ? " atx-type-tab--active" : ""}`}
-                                style={type === t ? { color: c.color, borderColor: c.color } : undefined}
+                                className={`atx-type-tab atx-type-tab--${t}${type === t ? " atx-type-tab--active" : ""}`}
                                 onClick={() => setType(t)}
                             >
-                                <Icon name={c.icon} size={18} filled={type === t} />
+                                <span className={`atx-type-tab__icon atx-type-tab__icon--${t}`}>
+                                    <Icon name={c.icon} size={18} filled={type === t} />
+                                </span>
                                 <span>{c.label}</span>
                             </button>
                         )
@@ -156,18 +220,95 @@ export const AddTransactionPage = () => {
 
                 {/* ── Date ── */}
                 <div className="atx-field-group">
-                    <label className="atx-label" htmlFor="atx-date">Ngày giao dịch</label>
-                    <div className="atx-field-row">
+                    <label className="atx-label">Ngày giao dịch</label>
+                    <button
+                        type="button"
+                        className={`atx-field-row atx-date-trigger${dateOpen ? " atx-date-trigger--open" : ""}`}
+                        onClick={dateOpen ? () => setDateOpen(false) : openCalendar}
+                    >
                         <Icon name="calendar_month" size={20} style={{ color: "var(--color-text-secondary)" }} />
-                        <input
-                            id="atx-date"
-                            type="date"
-                            className="atx-date-input"
-                            value={date}
-                            onChange={(e) => setDate(e.target.value)}
-                            max={todayIso()}
+                        <span className="atx-date-display">
+                            {date ? isoToDisplay(date) : <span className="atx-cat-trigger__placeholder">Chọn ngày</span>}
+                        </span>
+                        <Icon
+                            name="expand_more"
+                            size={16}
+                            style={{ color: "var(--color-text-secondary)", flexShrink: 0,
+                                     transform: dateOpen ? "rotate(180deg)" : "none",
+                                     transition: "transform var(--duration-fast) var(--ease-standard)" }}
                         />
-                    </div>
+                    </button>
+
+                    {dateOpen && (
+                        <div className="atx-cal">
+                            {/* Month navigation */}
+                            <div className="atx-cal__header">
+                                <button type="button" className="atx-cal__nav" onClick={prevMonth}>
+                                    <Icon name="chevron_left" size={20} />
+                                </button>
+                                <span className="atx-cal__title">
+                                    {VIET_MONTHS[calMonth - 1]} {calYear}
+                                </span>
+                                <button
+                                    type="button"
+                                    className="atx-cal__nav"
+                                    onClick={nextMonth}
+                                    disabled={isNextMonthDisabled}
+                                >
+                                    <Icon name="chevron_right" size={20} />
+                                </button>
+                            </div>
+
+                            {/* Day-of-week labels */}
+                            <div className="atx-cal__days-header">
+                                {DAY_LABELS.map((d, i) => (
+                                    <span key={i} className="atx-cal__day-label">{d}</span>
+                                ))}
+                            </div>
+
+                            {/* Day grid */}
+                            <div className="atx-cal__grid">
+                                {Array.from({ length: getFirstWeekday(calYear, calMonth) }).map((_, i) => (
+                                    <span key={`e${i}`} />
+                                ))}
+                                {Array.from({ length: getDaysInMonth(calYear, calMonth) }, (_, i) => i + 1).map((day) => {
+                                    const iso = `${calYear}-${String(calMonth).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+                                    const isSelected = iso === date;
+                                    const isToday    = iso === todayStr;
+                                    const isFuture   = iso > todayStr;
+                                    return (
+                                        <button
+                                            key={day}
+                                            type="button"
+                                            disabled={isFuture}
+                                            className={`atx-cal__day${isSelected ? " atx-cal__day--selected" : isToday ? " atx-cal__day--today" : ""}`}
+                                            onClick={() => { setDate(iso); setDateOpen(false); }}
+                                        >
+                                            {day}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+
+                            {/* Footer actions */}
+                            <div className="atx-cal__footer">
+                                <button
+                                    type="button"
+                                    className="atx-cal__action"
+                                    onClick={() => { setDate(todayStr); setDateOpen(false); }}
+                                >
+                                    Hôm nay
+                                </button>
+                                <button
+                                    type="button"
+                                    className="atx-cal__action atx-cal__action--close"
+                                    onClick={() => setDateOpen(false)}
+                                >
+                                    Đóng
+                                </button>
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 {/* ── Category ── */}
@@ -175,7 +316,7 @@ export const AddTransactionPage = () => {
                     <label className="atx-label" htmlFor="atx-cat">
                         Danh mục <span className="atx-req">*</span>
                     </label>
-                    <div className="atx-field-row">
+                    <div className="atx-field-row" ref={catFieldRef}>
                         <Icon name="category" size={20} style={{ color: "var(--color-text-secondary)" }} />
                         {catLoading ? (
                             <span className="atx-select-loading">
@@ -183,17 +324,23 @@ export const AddTransactionPage = () => {
                                 Đang tải...
                             </span>
                         ) : (
-                            <select
+                            <button
                                 id="atx-cat"
-                                className="atx-select"
-                                value={selectedCatId ?? ""}
-                                onChange={(e) => setSelectedCatId(e.target.value || null)}
+                                type="button"
+                                className="atx-cat-trigger"
+                                onClick={() => {
+                                    const rect = catFieldRef.current?.getBoundingClientRect();
+                                    if (rect) setCatAnchorRect(rect);
+                                    setCatOpen(true);
+                                }}
                             >
-                                <option value="">Chọn danh mục</option>
-                                {categories.map((cat) => (
-                                    <option key={cat.id} value={cat.id}>{cat.name}</option>
-                                ))}
-                            </select>
+                                {selectedCatId ? (
+                                    <span>{categories.find((c) => c.id === selectedCatId)?.name ?? "Chọn danh mục"}</span>
+                                ) : (
+                                    <span className="atx-cat-trigger__placeholder">Chọn danh mục</span>
+                                )}
+                                <Icon name="expand_more" size={16} style={{ color: "var(--color-text-secondary)", flexShrink: 0 }} />
+                            </button>
                         )}
                     </div>
                 </div>
@@ -253,6 +400,39 @@ export const AddTransactionPage = () => {
                     </button>
                 </div>
             </form>
+
+            {/* Category dropdown */}
+            {catOpen && catAnchorRect && (
+                <>
+                    <div className="dropdown-overlay" onClick={() => setCatOpen(false)} />
+                    <div
+                        className="dropdown-menu"
+                        style={{
+                            top: catAnchorRect.bottom + 4,
+                            left: catAnchorRect.left,
+                            width: catAnchorRect.width,
+                        }}
+                    >
+                        {categories.map((cat) => (
+                            <button
+                                key={cat.id}
+                                type="button"
+                                className={`dropdown-option${selectedCatId === cat.id ? " dropdown-option--active" : ""}`}
+                                onClick={() => {
+                                    setSelectedCatId(cat.id);
+                                    setCatOpen(false);
+                                }}
+                            >
+                                {cat.icon && <Icon name={cat.icon} size={18} />}
+                                <span className="dropdown-option__label">{cat.name}</span>
+                                {selectedCatId === cat.id && (
+                                    <Icon name="check" size={16} className="dropdown-option__check" />
+                                )}
+                            </button>
+                        ))}
+                    </div>
+                </>
+            )}
         </div>
     );
 };
