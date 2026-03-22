@@ -12,6 +12,7 @@ import { AddTransactionPage } from "@/pages/AddTransactionPage";
 import { ReceiptReviewPage } from "@/pages/ReceiptReviewPage";
 import { DeletedTransactionsPage } from "@/pages/DeletedTransactionsPage";
 import { OAuthCallbackPage } from "@/pages/OAuthCallbackPage";
+import { VerifyEmailPage } from "@/pages/VerifyEmailPage";
 
 /*
   Route structure:
@@ -51,6 +52,9 @@ export const router = createBrowserRouter([
 
     /* ── OAuth callback — outside auth guards, handles token from hash fragment ── */
     { path: "/oauth/callback", element: <OAuthCallbackPage /> },
+
+    /* ── Email verification — public, accessed via link in email ── */
+    { path: "/verify-email", element: <VerifyEmailPage /> },
 
     /* ── Fallback ── */
     { path: "*", element: <Navigate to="/" replace /> },

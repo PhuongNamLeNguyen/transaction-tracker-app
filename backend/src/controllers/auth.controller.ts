@@ -4,6 +4,7 @@ import { authService } from "../services/auth.service";
 import { asyncHandler } from "../utils/asyncHandler";
 import { sendSuccess } from "../utils/response";
 import { env } from "../config/env";
+import { AppError } from "../utils/AppError";
 
 const REFRESH_COOKIE_NAME = "refresh_token";
 const COOKIE_OPTIONS = {
@@ -105,10 +106,7 @@ export const authController = {
 
     googleRedirect: asyncHandler(async (_req: Request, res: Response) => {
         if (!env.googleClientId) {
-            throw Object.assign(new Error("Google OAuth is not configured"), {
-                statusCode: 501,
-                code: "NOT_IMPLEMENTED",
-            });
+            throw new AppError("Google OAuth is not configured", 501, "NOT_IMPLEMENTED");
         }
         const oauth2Client = new OAuth2Client(
             env.googleClientId,

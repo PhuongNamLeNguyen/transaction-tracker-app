@@ -6,6 +6,7 @@ import { env } from "../config/env";
 import { userRepo } from "../repositories/user.repo";
 import { sessionRepo } from "../repositories/session.repo";
 import { AppError } from "../utils/AppError";
+import { emailService } from "./email.service";
 
 // ─── Token helpers ───────────────────────────────────────────
 
@@ -55,7 +56,7 @@ export const authService = {
         const tokenHash = await bcrypt.hash(rawToken, BCRYPT_ROUNDS);
         await sessionRepo.createVerificationToken(user.id, tokenHash);
 
-        console.log(`[DEV] Verification token for ${email}: ${rawToken}`);
+        await emailService.sendVerificationEmail(email, name, rawToken);
 
         return { id: user.id, email: user.email, name: user.name };
     },
@@ -282,8 +283,7 @@ export const authService = {
         const tokenHash = await bcrypt.hash(rawToken, BCRYPT_ROUNDS);
         await sessionRepo.createPasswordResetToken(user.id, tokenHash);
 
-        // TODO: Gửi email
-        console.log(`[DEV] Password reset token for ${email}: ${rawToken}`);
+        await emailService.sendPasswordResetEmail(email, user.name ?? email.split("@")[0], rawToken);
     },
 
     // Reset password → verify token, update password, revoke tất cả sessions
