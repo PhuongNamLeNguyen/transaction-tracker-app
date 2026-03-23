@@ -145,12 +145,10 @@ export const ReceiptReviewPage = () => {
             // Currency conversion
             const rawAmount = s.totalAmount;
             const receiptCur = (s.currency ?? "").toUpperCase();
-            console.log("[ReceiptReview] currency detected:", s.currency, "| receiptCur:", receiptCur, "| userCur:", userCur, "| rawAmount:", rawAmount);
 
             if (rawAmount != null && receiptCur && receiptCur !== userCur) {
                 try {
                     const rate = await exchangeApi.getRate(receiptCur, userCur);
-                    console.log("[ReceiptReview] exchange rate", receiptCur, "→", userCur, "=", rate);
                     if (rate !== null) {
                         setAmount(String(roundAmount(rawAmount * rate, userCur)));
                         setConversionInfo({ original: rawAmount, from: receiptCur, rate });
@@ -158,13 +156,11 @@ export const ReceiptReviewPage = () => {
                         setAmount(String(roundAmount(rawAmount, userCur)));
                         setConversionInfo(null);
                     }
-                } catch (rateErr) {
-                    console.error("[ReceiptReview] exchange rate error:", rateErr);
+                } catch {
                     setAmount(String(roundAmount(rawAmount, userCur)));
                     setConversionInfo(null);
                 }
             } else {
-                if (!receiptCur) console.warn("[ReceiptReview] AI returned null currency — skipping conversion");
                 setAmount(rawAmount != null ? String(roundAmount(rawAmount, userCur)) : "");
                 setConversionInfo(null);
             }

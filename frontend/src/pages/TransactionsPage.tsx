@@ -227,7 +227,7 @@ function Calendar({
                     if (cell.isOutside) cls += " calendar__cell--outside";
                     if (cell.isWeekend && !cell.isOutside)
                         cls += " calendar__cell--weekend";
-                    if (isToday && !cell.isOutside)
+                    if (isToday && !cell.isOutside && (!selectedDate || isSelected))
                         cls += " calendar__cell--today";
                     if (isSelected && !cell.isOutside)
                         cls += " calendar__cell--selected";

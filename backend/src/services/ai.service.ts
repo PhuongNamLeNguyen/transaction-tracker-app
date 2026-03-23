@@ -93,7 +93,7 @@ export async function parseReceiptWithCategories(
             ? categories.map((c) => `- ${c.id}: ${c.name}`).join("\n")
             : "(no categories available — use null)";
 
-    const prompt = `You are a receipt parser. Extract all transaction data from this receipt image.
+    const prompt = `You are a receipt and invoice parser. Extract all transaction data from this document image.
 For each item, predict the best matching category from the list below.
 
 Available categories:
@@ -101,14 +101,14 @@ ${categoryList}
 
 Return ONLY valid JSON with this exact structure (no markdown, no extra text):
 {
-  "merchant": "store name or null",
+  "merchant": "the entity that ISSUED this document (who sent the bill / who the customer paid). For utility bills the issuer is the utility company whose name/logo appears at the top or as the document owner (e.g. '沖縄電力株式会社', '沖縄ガス', 'EVN'). IMPORTANT: convenience stores, supermarkets, banks, or post offices printed as payment acceptance points are NOT the merchant — ignore them. For regular purchase receipts the merchant is the store or restaurant. null only if truly unidentifiable.",
   "storeAddress": "address or null",
   "transactionDate": "ISO8601 datetime or null",
   "totalAmount": <number or null>,
   "currency": "ISO 4217 three-letter code ONLY (e.g. JPY, VND, USD, KRW, EUR, GBP, CNY, THB, SGD). Never use symbols like ¥ or $. Infer from receipt language/country if not printed. null only if truly unknown.",
   "taxAmount": <number or null>,
   "discountAmount": <number or null>,
-  "suggestedNote": "short activity description in the receipt's language (1–5 words, describes what the person DID, not what they bought). Examples: a BBQ restaurant → 'Ăn thịt nướng'; a transit card top-up receipt → 'Nạp thẻ tàu'; a gas station → 'Đổ xăng'; a coffee shop → 'Uống cà phê'; a supermarket → 'Mua sắm siêu thị'. Do NOT use generic 'Mua X' for services or dining.",
+  "suggestedNote": "short activity description in the receipt's language (1–5 words, describes what the person DID, not what they bought). Examples: a BBQ restaurant → 'Ăn thịt nướng'; a transit card top-up receipt → 'Nạp thẻ tàu'; a fuel station → 'Đổ xăng'; a coffee shop → 'Uống cà phê'; a supermarket → 'Mua sắm siêu thị'; an electricity bill → 'Thanh toán tiền điện'; a gas utility bill → 'Thanh toán tiền gas'; a water bill → 'Thanh toán tiền nước'. Do NOT use generic 'Mua X' for services or dining.",
   "items": [
     {
       "itemName": "item name",
@@ -127,9 +127,10 @@ Rules:
 - confidenceScore 0.70-0.84: moderate match
 - confidenceScore 0.30-0.69: weak/fallback match
 - confidenceScore < 0.30: no match, set predictedCategoryId and predictedCategoryName to null
-- If no items are visible, set items to []
+- For utility bills (electricity, gas, water): items = [] is normal if no itemized charges are shown; totalAmount = the payment due amount
+- For utility bills: merchant MUST be the issuing company (top of document), never a listed payment location such as a convenience store or supermarket
 - Never invent values not visible on the receipt
-- suggestedNote must reflect the activity (eating, topping up, fueling, shopping) inferred from merchant type and items — not a literal item list`;
+- suggestedNote must reflect the activity (eating, topping up, fueling, shopping, paying a utility bill) inferred from merchant type and items — not a literal item list`;
 
     const contentBlocks: Anthropic.MessageParam["content"] = [];
 

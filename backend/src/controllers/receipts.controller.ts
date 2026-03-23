@@ -75,7 +75,7 @@ async function buildSuggestion(params: {
     // Call Claude — extract receipt data + predict categories in one call
     const receiptData = await parseReceiptWithCategories(imageBuffer, mimeType, categories);
 
-    if (!receiptData.totalAmount && receiptData.items.length === 0) {
+    if (!receiptData.totalAmount && receiptData.items.length === 0 && !receiptData.merchant && !receiptData.suggestedNote) {
         throw new AppError(
             "No transaction details found. Please upload a receipt or invoice.",
             400,
