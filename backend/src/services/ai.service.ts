@@ -87,6 +87,7 @@ export async function parseReceiptWithCategories(
     categories: { id: string; name: string }[],
 ): Promise<AiReceiptData> {
     const base64 = imageBuffer.toString("base64");
+    const currentYear = new Date().getFullYear();
 
     const categoryList =
         categories.length > 0
@@ -101,9 +102,9 @@ ${categoryList}
 
 Return ONLY valid JSON with this exact structure (no markdown, no extra text):
 {
-  "merchant": "the entity that ISSUED this document (who sent the bill / who the customer paid). For utility bills the issuer is the utility company whose name/logo appears at the top or as the document owner (e.g. '沖縄電力株式会社', '沖縄ガス', 'EVN'). IMPORTANT: convenience stores, supermarkets, banks, or post offices printed as payment acceptance points are NOT the merchant — ignore them. For regular purchase receipts the merchant is the store or restaurant. null only if truly unidentifiable.",
+  "merchant": "the brand or store name printed as the document header (largest text at the top). For regular retail receipts (shopping, dining, convenience store, supermarket) the merchant IS that store — e.g. 'ファミリーマート', 'FamilyMart', '7-Eleven', 'McDonald's'. Building names, mall names, or location references that appear only in the address line are NOT the merchant. Exception — for utility/service invoices (electricity, gas, water, internet): the merchant is the company that issued the invoice, NOT a convenience store or bank listed as a payment agent. null only if truly unidentifiable.",
   "storeAddress": "address or null",
-  "transactionDate": "ISO8601 datetime or null",
+  "transactionDate": "ISO8601 datetime or date string (YYYY-MM-DDTHH:mm or YYYY-MM-DD). If only month and day are visible on the receipt but not the year, use ${currentYear} as the year. null only if date is truly not determinable.",
   "totalAmount": <number or null>,
   "currency": "ISO 4217 three-letter code ONLY (e.g. JPY, VND, USD, KRW, EUR, GBP, CNY, THB, SGD). Never use symbols like ¥ or $. Infer from receipt language/country if not printed. null only if truly unknown.",
   "taxAmount": <number or null>,
@@ -128,7 +129,8 @@ Rules:
 - confidenceScore 0.30-0.69: weak/fallback match
 - confidenceScore < 0.30: no match, set predictedCategoryId and predictedCategoryName to null
 - For utility bills (electricity, gas, water): items = [] is normal if no itemized charges are shown; totalAmount = the payment due amount
-- For utility bills: merchant MUST be the issuing company (top of document), never a listed payment location such as a convenience store or supermarket
+- For utility bills: merchant MUST be the issuing utility company (top of document), never a payment agent listed on the document such as a convenience store or bank
+- For regular retail receipts: the store brand printed at the top IS the merchant — never replace it with a building name, mall name, or address component
 - Never invent values not visible on the receipt
 - suggestedNote must reflect the activity (eating, topping up, fueling, shopping, paying a utility bill) inferred from merchant type and items — not a literal item list`;
 

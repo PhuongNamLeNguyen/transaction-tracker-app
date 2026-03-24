@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { receiptsApi, type TransactionSuggestion } from "@/api/receipts.api";
 import {
@@ -43,14 +43,30 @@ const TX_TYPES: TransactionType[] = [
 
 /** Parse ISO datetime (or date-only) → datetime-local string (YYYY-MM-DDTHH:mm) */
 function isoToDateTimeLocal(iso: string | null): string {
+    const now = new Date();
+    const currentYear = now.getFullYear();
+
     if (!iso) {
-        const d = new Date();
-        const date = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-        const time = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+        const date = `${currentYear}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+        const time = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
         return `${date}T${time}`;
     }
-    if (iso.includes("T")) return iso.slice(0, 16);
-    return `${iso}T00:00`;
+
+    // Handle ISO 8601 partial dates with no year (e.g. "--03-24" or "--03-24T14:46")
+    if (iso.startsWith("--")) {
+        const withYear = `${currentYear}-${iso.slice(2)}`;
+        return withYear.includes("T") ? withYear.slice(0, 16) : `${withYear}T00:00`;
+    }
+
+    const withTime = iso.includes("T") ? iso.slice(0, 16) : `${iso}T00:00`;
+
+    // If year looks like a placeholder (0000, 0001, etc.), replace with current year
+    const year = parseInt(withTime.slice(0, 4), 10);
+    if (year < 100) {
+        return `${currentYear}${withTime.slice(4)}`;
+    }
+
+    return withTime;
 }
 
 /** Round amount to nearest 1000 for VND, else keep as integer */
@@ -98,6 +114,10 @@ export const ReceiptReviewPage = () => {
     const [merchant, setMerchant] = useState("");
 
     const [selectedCategoryId, setSelectedCategoryId] = useState<string>("");
+    const [catOpen, setCatOpen] = useState(false);
+    const [catAnchorRect, setCatAnchorRect] = useState<DOMRect | null>(null);
+    const catFieldRef = useRef<HTMLDivElement>(null);
+    const dateInputRef = useRef<HTMLInputElement>(null);
 
     const [accountCurrency, setAccountCurrency] = useState("VND");
     const [conversionInfo, setConversionInfo] = useState<ConversionInfo | null>(null);
@@ -345,21 +365,26 @@ export const ReceiptReviewPage = () => {
                 </div>
 
                 {/* ── Danh mục ── */}
-                <div className="detail-row">
+                <div className="detail-row" ref={catFieldRef}>
                     <span className="detail-row__label">Danh mục</span>
-                    <select
-                        className="rxv-pill-select"
-                        value={selectedCategoryId}
-                        onChange={(e) => setSelectedCategoryId(e.target.value)}
-                        style={{ color: "var(--color-text-secondary)" }}
+                    <button
+                        type="button"
+                        className="rxv-cat-trigger"
+                        onClick={() => {
+                            const rect = catFieldRef.current?.getBoundingClientRect();
+                            if (rect) setCatAnchorRect(rect);
+                            setCatOpen(true);
+                        }}
                     >
-                        <option value="">Chọn danh mục</option>
-                        {categories.map((c) => (
-                            <option key={c.id} value={c.id}>
-                                {c.name}
-                            </option>
-                        ))}
-                    </select>
+                        {selectedCategoryId ? (
+                            <span className="rxv-cat-trigger__value">
+                                {categories.find((c) => c.id === selectedCategoryId)?.name ?? "Chọn danh mục"}
+                            </span>
+                        ) : (
+                            <span className="rxv-cat-trigger__placeholder">Chọn danh mục</span>
+                        )}
+                        <Icon name="expand_more" size={14} className="rxv-cat-trigger__chevron" />
+                    </button>
                 </div>
 
                 {/* ── Số tiền — editable ── */}
@@ -398,17 +423,30 @@ export const ReceiptReviewPage = () => {
                             {formatDateTimeDisplay(dateTime)}
                         </span>
                         <input
+                            ref={dateInputRef}
                             type="datetime-local"
                             className="rxv-date-hidden"
                             value={dateTime}
                             onChange={(e) => setDateTime(e.target.value)}
                             aria-label="Chọn ngày giờ"
+                            tabIndex={-1}
                         />
-                        <Icon
-                            name="edit"
-                            size={14}
-                            className="rxv-date-edit-icon"
-                        />
+                        <button
+                            type="button"
+                            className="rxv-date-edit-btn"
+                            aria-label="Chỉnh ngày giờ"
+                            onClick={() => {
+                                const input = dateInputRef.current;
+                                if (!input) return;
+                                if (typeof input.showPicker === "function") {
+                                    input.showPicker();
+                                } else {
+                                    input.click();
+                                }
+                            }}
+                        >
+                            <Icon name="edit" size={14} />
+                        </button>
                     </div>
                 </div>
 
@@ -454,6 +492,39 @@ export const ReceiptReviewPage = () => {
                     </div>
                 )}
             </div>
+
+            {/* Category dropdown */}
+            {catOpen && catAnchorRect && (
+                <>
+                    <div className="dropdown-overlay" onClick={() => setCatOpen(false)} />
+                    <div
+                        className="dropdown-menu"
+                        style={{
+                            top: catAnchorRect.bottom + 4,
+                            left: catAnchorRect.left,
+                            width: catAnchorRect.width,
+                        }}
+                    >
+                        {categories.map((cat) => (
+                            <button
+                                key={cat.id}
+                                type="button"
+                                className={`dropdown-option${selectedCategoryId === cat.id ? " dropdown-option--active" : ""}`}
+                                onClick={() => {
+                                    setSelectedCategoryId(cat.id);
+                                    setCatOpen(false);
+                                }}
+                            >
+                                {cat.icon && <Icon name={cat.icon} size={18} />}
+                                <span className="dropdown-option__label">{cat.name}</span>
+                                {selectedCategoryId === cat.id && (
+                                    <Icon name="check" size={16} className="dropdown-option__check" />
+                                )}
+                            </button>
+                        ))}
+                    </div>
+                </>
+            )}
 
             {/* Sticky confirm footer */}
             <div className="rxv-footer">

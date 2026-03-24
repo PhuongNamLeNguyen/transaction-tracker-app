@@ -699,10 +699,19 @@ export const DashboardPage = () => {
                                     onClick={() => openTxDetail(tx.transactionId)}
                                 >
                                     <div className="txcard__icon">
-                                        {tx.type === "income"     && <Icon name="trending_up"       size={20} />}
-                                        {tx.type === "expense"    && <Icon name="shopping_bag"      size={20} />}
-                                        {tx.type === "investment" && <Icon name="candlestick_chart" size={20} />}
-                                        {tx.type === "saving"     && <Icon name="savings"           size={20} />}
+                                        <Icon
+                                            name={
+                                                tx.categoryIcon ??
+                                                (tx.type === "income"
+                                                    ? "trending_up"
+                                                    : tx.type === "expense"
+                                                      ? "shopping_bag"
+                                                      : tx.type === "investment"
+                                                        ? "candlestick_chart"
+                                                        : "savings")
+                                            }
+                                            size={20}
+                                        />
                                     </div>
                                     <div className="txcard__body">
                                         <div className={`txcard__amount txcard__amount--${tx.type}`}>
