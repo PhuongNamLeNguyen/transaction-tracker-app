@@ -29,7 +29,7 @@ const createManualSchema = z.object({
 
 const createReceiptSchema = z.object({
     type: z.enum(["income", "expense", "investment", "saving"]),
-    transactionDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    transactionDate: z.string().regex(/^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2})?$/),
     receiptId: z.string().uuid(),
     note: z.string().max(500).optional(),
     items: z

@@ -170,7 +170,7 @@ function DetailSheet({
     onUpdate: (id: string) => void;
 }) {
     const splits = tx.splits;
-    const timeStr = formatTime(tx.createdAt);
+    const timeStr = formatTime(tx.source === "receipt_scan" ? tx.transactionDate : tx.createdAt);
     const dateStr = formatDateShort(tx.transactionDate);
     const typeColor = TYPE_COLORS[tx.type];
     const categoryLabel = splits.map((s) => s.categoryName).join(", ");
@@ -726,7 +726,7 @@ export const DashboardPage = () => {
                                             <span className="txcard__cat-pill">{tx.categoryName}</span>
                                         )}
                                         <span className="txcard__time">
-                                            {formatTime(tx.createdAt)} – {formatDate(tx.transactionDate)}
+                                            {formatTime(tx.source === "receipt_scan" ? tx.transactionDate : tx.createdAt)} – {formatDate(tx.transactionDate)}
                                         </span>
                                     </div>
                                 </div>

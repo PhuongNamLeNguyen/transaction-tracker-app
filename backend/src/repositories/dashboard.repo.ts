@@ -24,7 +24,7 @@ export const dashboardRepo = {
              WHERE  t.user_id         = $1
                AND  t.status          = 'confirmed'
                AND  t.deleted_at      IS NULL
-               AND  t.transaction_date BETWEEN bp.start_date AND bp.end_date
+               AND  t.transaction_date::date BETWEEN bp.start_date AND bp.end_date
              GROUP BY t.type`,
             [userId, periodId],
         );
@@ -60,7 +60,7 @@ export const dashboardRepo = {
                AND  t.status           = 'confirmed'
                AND  t.deleted_at       IS NULL
                AND  ts.deleted_at      IS NULL
-               AND  t.transaction_date BETWEEN bp.start_date AND bp.end_date
+               AND  t.transaction_date::date BETWEEN bp.start_date AND bp.end_date
              GROUP BY c.id, c.name, c.icon, t.type
              ORDER BY total DESC`,
             [userId, periodId],
@@ -172,7 +172,7 @@ export const dashboardRepo = {
              WHERE  t.user_id          = $1
                AND  t.status           = 'confirmed'
                AND  t.deleted_at       IS NULL
-               AND  t.transaction_date BETWEEN bp.start_date AND bp.end_date
+               AND  t.transaction_date::date BETWEEN bp.start_date AND bp.end_date
              GROUP BY t.id, t.transaction_date, t.type, t.amount, t.currency,
                       t.note, t.source, m.name
              ORDER BY t.transaction_date DESC, t.created_at DESC

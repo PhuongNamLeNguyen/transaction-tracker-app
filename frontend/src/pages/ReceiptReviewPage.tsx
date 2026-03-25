@@ -116,7 +116,7 @@ export const ReceiptReviewPage = () => {
     const [selectedCategoryId, setSelectedCategoryId] = useState<string>("");
     const [catOpen, setCatOpen] = useState(false);
     const [catAnchorRect, setCatAnchorRect] = useState<DOMRect | null>(null);
-    const catFieldRef = useRef<HTMLDivElement>(null);
+
     const dateInputRef = useRef<HTMLInputElement>(null);
 
     const [accountCurrency, setAccountCurrency] = useState("VND");
@@ -222,7 +222,7 @@ export const ReceiptReviewPage = () => {
         try {
             await transactionsApi.createFromReceipt({
                 type: selectedType,
-                transactionDate: dateTime.slice(0, 10),
+                transactionDate: dateTime,
                 receiptId: suggestion.receiptId!,
                 note: note.trim() || undefined,
                 items: splits,
@@ -365,14 +365,13 @@ export const ReceiptReviewPage = () => {
                 </div>
 
                 {/* ── Danh mục ── */}
-                <div className="detail-row" ref={catFieldRef}>
+                <div className="detail-row">
                     <span className="detail-row__label">Danh mục</span>
                     <button
                         type="button"
                         className="rxv-cat-trigger"
-                        onClick={() => {
-                            const rect = catFieldRef.current?.getBoundingClientRect();
-                            if (rect) setCatAnchorRect(rect);
+                        onClick={(e) => {
+                            setCatAnchorRect(e.currentTarget.getBoundingClientRect());
                             setCatOpen(true);
                         }}
                     >

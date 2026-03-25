@@ -145,13 +145,14 @@ async function buildSuggestion(params: {
             receiptId,
             confidenceLevel,
             merchant: merchantObj
-                ? { id: merchantObj.id, name: merchantObj.name, storeAddress: receiptData.storeAddress }
+                ? { id: merchantObj.id, name: receiptData.merchant, storeAddress: receiptData.storeAddress }
                 : null,
             transactionDate: receiptData.transactionDate,
             totalAmount: receiptData.totalAmount,
             currency: receiptData.currency,
             taxAmount: receiptData.taxAmount,
             discountAmount: receiptData.discountAmount,
+            suggestedNote: receiptData.suggestedNote,
             items: itemResults,
         },
         confidenceLevel,
