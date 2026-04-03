@@ -317,7 +317,7 @@ function DetailSheet({
                             ) : (
                                 <div className="detail-row__value-row">
                                     <span className="detail-row__value">
-                                        {tx.merchantName || tx.note || "Giao dịch"}
+                                        {tx.note ?? "—"}
                                     </span>
                                     <button className="detail-row__edit-btn" onClick={() => setEditingField("note")} type="button" aria-label="Chỉnh sửa nội dung">
                                         <Icon name="edit" size={14} className="detail-row__edit-icon" />

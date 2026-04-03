@@ -49,6 +49,8 @@ export const transactionsController = {
         const type = (req.query.type as string) || undefined;
         const categoryId = (req.query.category_id as string) || undefined;
 
+        if (year != null && (year < 1900 || year > 2100))
+            throw new AppError("Invalid year", 400, "VALIDATION_ERROR");
         if (month != null && (month < 1 || month > 12))
             throw new AppError("Invalid month", 400, "VALIDATION_ERROR");
 

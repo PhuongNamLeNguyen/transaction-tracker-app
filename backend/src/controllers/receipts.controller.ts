@@ -20,7 +20,14 @@ const storage = multer.diskStorage({
         cb(null, dir);
     },
     filename: (_req, file, cb) => {
-        const ext = path.extname(file.originalname).toLowerCase() || ".jpg";
+        const MIME_TO_EXT: Record<string, string> = {
+            "image/jpeg": ".jpg",
+            "image/jpg": ".jpg",
+            "image/png": ".png",
+            "image/heic": ".heic",
+            "application/pdf": ".pdf",
+        };
+        const ext = MIME_TO_EXT[file.mimetype] ?? ".jpg";
         cb(null, `${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`);
     },
 });

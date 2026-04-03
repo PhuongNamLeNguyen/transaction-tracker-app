@@ -475,7 +475,7 @@ function DetailSheet({
                             ) : (
                                 <div className="detail-row__value-row">
                                     <span className="detail-row__value">
-                                        {txLabel(tx)}
+                                        {tx.note ?? "—"}
                                     </span>
                                     <button
                                         className="detail-row__edit-btn"

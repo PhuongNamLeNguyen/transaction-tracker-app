@@ -10,6 +10,7 @@ import { BudgetPage } from "@/pages/BudgetPage";
 import { SettingsPage } from "@/pages/SettingsPage";
 import { AddTransactionPage } from "@/pages/AddTransactionPage";
 import { ReceiptReviewPage } from "@/pages/ReceiptReviewPage";
+import { ImageCropPage } from "@/pages/ImageCropPage";
 import { DeletedTransactionsPage } from "@/pages/DeletedTransactionsPage";
 import { OAuthCallbackPage } from "@/pages/OAuthCallbackPage";
 import { VerifyEmailPage } from "@/pages/VerifyEmailPage";
@@ -41,6 +42,7 @@ export const router = createBrowserRouter([
             { path: "/settings",          element: <SettingsPage /> },
             { path: "/add-transaction",   element: <AddTransactionPage /> },
             { path: "/receipt-review",         element: <ReceiptReviewPage /> },
+            { path: "/image-crop",             element: <ImageCropPage /> },
             { path: "/deleted-transactions",   element: <DeletedTransactionsPage /> },
             // Các route sau sẽ thêm dần theo từng feature:
             // { path: '/transactions/:id', element: <TransactionDetailPage /> },

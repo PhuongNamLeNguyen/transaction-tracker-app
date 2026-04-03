@@ -129,7 +129,9 @@ export const BottomNav = () => {
     function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
         const file = e.target.files?.[0];
         if (file && pendingTypeRef.current) {
-            navigate("/receipt-review", { state: { file, type: pendingTypeRef.current } });
+            const isPdf = file.type === "application/pdf";
+            const dest = isPdf ? "/receipt-review" : "/image-crop";
+            navigate(dest, { state: { file, type: pendingTypeRef.current } });
         }
         // Reset so the same file can be re-selected
         e.target.value = "";

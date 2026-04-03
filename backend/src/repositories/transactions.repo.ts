@@ -182,12 +182,18 @@ export const transactionsRepo = {
         try {
             await client.query("BEGIN");
 
+            const receiptRow = await client.query(
+                `SELECT merchant_id FROM receipts WHERE id = $1`,
+                [receiptId],
+            );
+            const merchantId = receiptRow.rows[0]?.merchant_id ?? null;
+
             const txResult = await client.query(
                 `INSERT INTO transactions
-                   (user_id, account_id, type, amount, currency, status, source, transaction_date, note)
-                 VALUES ($1, $2, $3, $4, $5, 'confirmed', 'receipt_scan', $6, $7)
+                   (user_id, account_id, type, amount, currency, status, source, transaction_date, note, merchant_id)
+                 VALUES ($1, $2, $3, $4, $5, 'confirmed', 'receipt_scan', $6, $7, $8)
                  RETURNING id, type, amount, currency, transaction_date, note, created_at`,
-                [userId, accountId, type, amount, currency, transactionDate, note ?? null],
+                [userId, accountId, type, amount, currency, transactionDate, note ?? null, merchantId],
             );
             const tx = txResult.rows[0];
 

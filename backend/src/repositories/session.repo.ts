@@ -41,11 +41,15 @@ export const sessionRepo = {
     },
     findActiveSessionByToken: async (rawToken: string) => {
         const bcrypt = await import("bcryptjs");
+        // Limit scan to sessions created within the longest TTL (30 days)
+        // to avoid scanning all sessions in the database
         const result = await query(
             `SELECT * FROM sessions
          WHERE revoked_at IS NULL
            AND expired_at > now()
-         ORDER BY created_at DESC`,
+           AND created_at > now() - interval '31 days'
+         ORDER BY created_at DESC
+         LIMIT 500`,
         );
 
         for (const session of result.rows) {
@@ -111,11 +115,13 @@ export const sessionRepo = {
     },
 
     findVerificationTokenByHash: async (rawToken: string) => {
-        // Lấy tất cả token còn hạn, rồi so sánh bcrypt từng cái
+        // Lấy token còn hạn trong 24h (đúng với TTL) — giới hạn scan
         const result = await query(
             `SELECT * FROM verification_tokens
      WHERE expired_at > now()
-     ORDER BY created_at DESC`,
+       AND created_at > now() - interval '25 hours'
+     ORDER BY created_at DESC
+     LIMIT 200`,
         );
         return result.rows; // trả về array để service tự bcrypt.compare
     },
@@ -124,7 +130,9 @@ export const sessionRepo = {
             `SELECT * FROM password_reset_tokens
      WHERE expired_at > now()
        AND used_at IS NULL
-     ORDER BY created_at DESC`,
+       AND created_at > now() - interval '2 hours'
+     ORDER BY created_at DESC
+     LIMIT 200`,
         );
         return result.rows;
     },
