@@ -5,11 +5,11 @@
     "main": "index.js",
     "scripts": {
         "test": "echo \"Error: no test specified\" && exit 1",
-        "dev": "nodemon --exec tsx server.ts",
+        "dev": "nodemon --exec \"node node_modules/tsx/dist/cli.mjs server.ts\"",
         "build": "node node_modules/typescript/bin/tsc",
         "start": "node dist/server.js",
-        "migrate": "tsx migrate.ts",
-        "seed": "tsx seed.ts",
+        "migrate": "node node_modules/tsx/dist/cli.mjs migrate.ts",
+        "seed": "node node_modules/tsx/dist/cli.mjs seed.ts",
         "db:setup": "npm run migrate && npm run seed"
     },
     "keywords": [],
