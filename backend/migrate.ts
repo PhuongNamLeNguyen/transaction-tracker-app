@@ -16,15 +16,8 @@ if (!process.env.DATABASE_URL) {
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
-// Migrations folder: try relative to this file first, then fallback to cwd
-const CANDIDATES = [
-    path.resolve(__dirname, "../database/migrations"),  // running as source: backend/ -> repo root
-    path.resolve(__dirname, "../../database/migrations"), // running from dist/
-    path.resolve(process.cwd(), "database/migrations"),   // cwd = backend/
-    path.resolve(process.cwd(), "../database/migrations"),// cwd = repo root
-];
-
-const MIGRATIONS_DIR = CANDIDATES.find((p) => fs.existsSync(p)) ?? CANDIDATES[0];
+// Migrations folder is inside backend/database/migrations
+const MIGRATIONS_DIR = path.resolve(__dirname, "database/migrations");
 console.log(`📁 Migrations dir: ${MIGRATIONS_DIR}`);
 
 async function migrate() {
