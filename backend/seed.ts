@@ -13,34 +13,34 @@ const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 /* ─── Category data ─────────────────────────────────────────── */
 
 const EXPENSE_CATEGORIES = [
-    { name: "Ăn uống",       icon: "fork_knife" },
-    { name: "Di chuyển",     icon: "car" },
-    { name: "Phí sinh hoạt", icon: "house" },
-    { name: "Giáo dục",      icon: "book" },
-    { name: "Thời trang",    icon: "shirt" },
-    { name: "Sức khỏe",      icon: "heart" },
-    { name: "Quà tặng",      icon: "gift" },
-    { name: "Giải trí",      icon: "smile" },
-    { name: "Thú cưng",      icon: "paw" },
-    { name: "Khác",           icon: "dots" },
+    { name: "Ăn uống",       icon: "restaurant" },
+    { name: "Di chuyển",     icon: "directions_car" },
+    { name: "Phí sinh hoạt", icon: "home" },
+    { name: "Giáo dục",      icon: "menu_book" },
+    { name: "Thời trang",    icon: "checkroom" },
+    { name: "Sức khỏe",      icon: "favorite" },
+    { name: "Quà tặng",      icon: "card_giftcard" },
+    { name: "Giải trí",      icon: "celebration" },
+    { name: "Thú cưng",      icon: "pets" },
+    { name: "Khác",           icon: "more_horiz" },
 ];
 
 const INCOME_CATEGORIES = [
-    { name: "Lương",    icon: "briefcase" },
+    { name: "Lương",    icon: "work" },
     { name: "Thưởng",   icon: "star" },
-    { name: "Quà tặng", icon: "gift" },
+    { name: "Quà tặng", icon: "card_giftcard" },
 ];
 
 const INVESTMENT_CATEGORIES = [
-    { name: "Mua vàng",                    icon: "gold_bar" },
-    { name: "Mua bất động sản",            icon: "building" },
-    { name: "Mua chứng khoán / cổ phiếu", icon: "chart_up" },
+    { name: "Mua vàng",                    icon: "paid" },
+    { name: "Mua bất động sản",            icon: "apartment" },
+    { name: "Mua chứng khoán / cổ phiếu", icon: "trending_up" },
     { name: "Kinh doanh",                  icon: "store" },
 ];
 
 const SAVING_CATEGORIES = [
-    { name: "Gửi tiết kiệm cá nhân", icon: "piggy_bank" },
-    { name: "Đóng bảo hiểm dài hạn", icon: "shield" },
+    { name: "Gửi tiết kiệm cá nhân", icon: "savings" },
+    { name: "Đóng bảo hiểm dài hạn", icon: "security" },
 ];
 
 /* ─── Seed ──────────────────────────────────────────────────── */
