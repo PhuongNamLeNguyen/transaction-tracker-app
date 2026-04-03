@@ -9,12 +9,29 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
+if (!process.env.DATABASE_URL) {
+    console.error("❌ Migration failed: DATABASE_URL environment variable is not set.");
+    process.exit(1);
+}
+
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
-// Migrations folder is at repo-root/database/migrations (one level above backend/)
-const MIGRATIONS_DIR = path.resolve(__dirname, "../database/migrations");
+// Migrations folder: try relative to this file first, then fallback to cwd
+const CANDIDATES = [
+    path.resolve(__dirname, "../database/migrations"),  // running as source: backend/ -> repo root
+    path.resolve(__dirname, "../../database/migrations"), // running from dist/
+    path.resolve(process.cwd(), "database/migrations"),   // cwd = backend/
+    path.resolve(process.cwd(), "../database/migrations"),// cwd = repo root
+];
+
+const MIGRATIONS_DIR = CANDIDATES.find((p) => fs.existsSync(p)) ?? CANDIDATES[0];
+console.log(`📁 Migrations dir: ${MIGRATIONS_DIR}`);
 
 async function migrate() {
+    if (!fs.existsSync(MIGRATIONS_DIR)) {
+        throw new Error(`Migrations directory not found: ${MIGRATIONS_DIR}`);
+    }
+
     const client = await pool.connect();
     try {
         // Get all .sql files, sorted by filename
@@ -51,6 +68,6 @@ async function migrate() {
 }
 
 migrate().catch((err) => {
-    console.error("❌ Migration failed:", err.message);
+    console.error("❌ Migration failed:", err instanceof Error ? err.stack : String(err));
     process.exit(1);
 });
