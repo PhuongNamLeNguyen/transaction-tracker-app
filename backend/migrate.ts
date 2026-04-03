@@ -11,7 +11,7 @@ dotenv.config();
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
-// Sub-directories in migrations/ are skipped (e.g. auth/)
+// Migrations folder is at repo-root/database/migrations (one level above backend/)
 const MIGRATIONS_DIR = path.resolve(__dirname, "../database/migrations");
 
 async function migrate() {
