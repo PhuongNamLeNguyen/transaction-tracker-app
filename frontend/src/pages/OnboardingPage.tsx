@@ -474,13 +474,15 @@ export const OnboardingPage = () => {
                         <div className="ob-picker-list">
                             {availableCategories.length > 0 ? (
                                 availableCategories.map((cat) => (
-                                    <div
+                                    <button
                                         key={cat.id}
+                                        type="button"
                                         className="ob-picker-item"
                                         onClick={() => addCategory(cat)}
                                     >
-                                        {cat.name}
-                                    </div>
+                                        {cat.icon && <Icon name={cat.icon} size={18} />}
+                                        <span>{cat.name}</span>
+                                    </button>
                                 ))
                             ) : (
                                 <p className="ob-picker-empty">
