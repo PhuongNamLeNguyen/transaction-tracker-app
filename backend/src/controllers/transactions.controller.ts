@@ -97,7 +97,7 @@ export const transactionsController = {
     /** PATCH /transactions/:id — update note, transactionDate, merchantName */
     update: asyncHandler(async (req: Request, res: Response) => {
         const userId = req.user!.id;
-        const { id } = req.params;
+        const id = String(req.params.id);
 
         const schema = z.object({
             note:            z.string().max(500).nullable().optional(),
@@ -194,7 +194,7 @@ export const transactionsController = {
     /** DELETE /transactions/:id — soft-delete entire transaction */
     deleteTransaction: asyncHandler(async (req: Request, res: Response) => {
         const userId = req.user!.id;
-        const { id } = req.params;
+        const id = String(req.params.id);
         const deleted = await transactionsRepo.softDeleteTransaction(userId, id);
         if (!deleted) throw new AppError("Transaction not found", 404, "RESOURCE_NOT_FOUND");
         sendSuccess(res, { success: true });
@@ -203,7 +203,8 @@ export const transactionsController = {
     /** DELETE /transactions/:id/splits/:splitId — soft-delete */
     deleteSplit: asyncHandler(async (req: Request, res: Response) => {
         const userId = req.user!.id;
-        const { id: transactionId, splitId } = req.params;
+        const transactionId = String(req.params.id);
+        const splitId = String(req.params.splitId);
         const deleted = await transactionsRepo.softDeleteSplit(userId, transactionId, splitId);
         if (!deleted) throw new AppError("Split not found", 404, "RESOURCE_NOT_FOUND");
         sendSuccess(res, { success: true });
@@ -212,7 +213,8 @@ export const transactionsController = {
     /** DELETE /transactions/:id/splits/:splitId/permanent — hard-delete */
     hardDeleteSplit: asyncHandler(async (req: Request, res: Response) => {
         const userId = req.user!.id;
-        const { id: transactionId, splitId } = req.params;
+        const transactionId = String(req.params.id);
+        const splitId = String(req.params.splitId);
         const deleted = await transactionsRepo.hardDeleteSplit(userId, transactionId, splitId);
         if (!deleted) throw new AppError("Split not found or not deleted", 404, "RESOURCE_NOT_FOUND");
         sendSuccess(res, { success: true });
@@ -232,7 +234,8 @@ export const transactionsController = {
     /** PATCH /transactions/:id/splits/:splitId/restore — restore */
     restoreSplit: asyncHandler(async (req: Request, res: Response) => {
         const userId = req.user!.id;
-        const { id: transactionId, splitId } = req.params;
+        const transactionId = String(req.params.id);
+        const splitId = String(req.params.splitId);
         const restored = await transactionsRepo.restoreSplit(userId, transactionId, splitId);
         if (!restored) throw new AppError("Split not found or not deleted", 404, "RESOURCE_NOT_FOUND");
         sendSuccess(res, { success: true });
@@ -271,7 +274,7 @@ export const transactionsController = {
     /** PATCH /transactions/:id/restore — restore soft-deleted transaction */
     restoreTransaction: asyncHandler(async (req: Request, res: Response) => {
         const userId = req.user!.id;
-        const { id } = req.params;
+        const id = String(req.params.id);
         const restored = await transactionsRepo.restoreTransaction(userId, id);
         if (!restored) throw new AppError("Transaction not found", 404, "RESOURCE_NOT_FOUND");
         sendSuccess(res, { success: true });
@@ -280,7 +283,7 @@ export const transactionsController = {
     /** DELETE /transactions/:id/permanent — hard-delete soft-deleted transaction */
     hardDeleteTransaction: asyncHandler(async (req: Request, res: Response) => {
         const userId = req.user!.id;
-        const { id } = req.params;
+        const id = String(req.params.id);
         const deleted = await transactionsRepo.hardDeleteTransaction(userId, id);
         if (!deleted) throw new AppError("Transaction not found", 404, "RESOURCE_NOT_FOUND");
         sendSuccess(res, { success: true });
