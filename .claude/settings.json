@@ -2,7 +2,10 @@
   "permissions": {
     "allow": [
       "Bash(npm uninstall:*)",
-      "Bash(node node_modules/typescript/bin/tsc --noEmit)"
+      "Bash(node node_modules/typescript/bin/tsc --noEmit)",
+      "Bash(node -e \"const b=require\\('./backend/node_modules/typescript/package.json'\\); console.log\\('backend TS:', b.version\\)\")",
+      "Bash(node -e \"const f=require\\('./frontend/node_modules/typescript/package.json'\\); console.log\\('frontend TS:', f.version\\)\")",
+      "Read(//d/WORK/Project AI/**)"
     ]
   }
 }
