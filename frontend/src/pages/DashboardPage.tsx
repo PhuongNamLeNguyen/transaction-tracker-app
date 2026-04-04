@@ -5,13 +5,14 @@ import {
     dashboardApi,
     type DashboardResponse,
     type DashboardTransaction,
-    type CashflowSummary,
+    type ExpenseBreakdown,
 } from "@/api/dashboard.api";
 import {
     transactionsApi,
     type TxDetail,
     type TransactionType,
 } from "@/api/transactions.api";
+import { settingsApi } from "@/api/settings.api";
 import { BottomNav } from "@/components/common/BottomNav";
 import { Icon } from "@/components/common/Icon";
 import "@/styles/dashboard.css";
@@ -58,6 +59,55 @@ function monthLabel(month: number, year: number): string {
     return `${month}/${year}`;
 }
 
+/**
+ * Compute the ISO startDate / endDate for a "labeled month" given the user's cycleStartDay.
+ * cycleStartDay=1 (or null) → calendar month.
+ * cycleStartDay=20, month=3 → 2025-03-20 to 2025-04-19.
+ */
+function getCycleDates(year: number, month: number, cycleStartDay: number): { startDate: string; endDate: string } {
+    const pad = (n: number) => String(n).padStart(2, "0");
+
+    if (cycleStartDay <= 1) {
+        const lastDay = new Date(year, month, 0).getDate();
+        return {
+            startDate: `${year}-${pad(month)}-01`,
+            endDate:   `${year}-${pad(month)}-${pad(lastDay)}`,
+        };
+    }
+
+    // start = cycleStartDay of this month
+    const start = new Date(year, month - 1, cycleStartDay);
+    // end   = (cycleStartDay - 1) of next month
+    const end   = new Date(year, month, cycleStartDay - 1);
+
+    return {
+        startDate: `${start.getFullYear()}-${pad(start.getMonth() + 1)}-${pad(start.getDate())}`,
+        endDate:   `${end.getFullYear()}-${pad(end.getMonth() + 1)}-${pad(end.getDate())}`,
+    };
+}
+
+/**
+ * Return the "labeled month" of the current cycle.
+ * e.g. today=Apr-4, cycleStartDay=20 → {year:2025, month:3} (still in Mar cycle).
+ */
+function getCurrentCycleMonth(cycleStartDay: number): { year: number; month: number } {
+    const today = new Date();
+    const todayDay = today.getDate();
+
+    if (cycleStartDay <= 1 || todayDay >= cycleStartDay) {
+        return { year: today.getFullYear(), month: today.getMonth() + 1 };
+    }
+    // today is before cycleStartDay → still in previous month's cycle
+    const prev = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+    return { year: prev.getFullYear(), month: prev.getMonth() + 1 };
+}
+
+/** Short date label: "20/3" */
+function shortDate(isoDate: string): string {
+    const [, m, d] = isoDate.split("-");
+    return `${parseInt(d)}/${parseInt(m)}`;
+}
+
 function typeSign(type: DashboardTransaction["type"]): string {
     return type === "income" ? "+" : "-";
 }
@@ -81,21 +131,22 @@ type EditingField = "date" | "note" | "merchant" | null;
 /* ─────────────────────────────────────────
    SVG Pie Chart
 ───────────────────────────────────────── */
-const SLICE_COLORS = {
-    expense:    "#dc2626",
-    investment: "#7c3aed",
-    saving:     "#2563eb",
-    available:  "#e07b39",
-};
+// Palette for expense category slices (cycles through these)
+const CAT_PALETTE = [
+    "#dc2626", "#e07b39", "#d97706", "#65a30d",
+    "#0891b2", "#2563eb", "#7c3aed", "#db2777",
+    "#6b7280",
+];
 
 interface SliceData {
     key:   string;
     label: string;
     value: number;
     color: string;
+    icon?: string | null;
 }
 
-function PieChart({ slices }: { slices: SliceData[] }) {
+function PieChart({ slices, totalLabel }: { slices: SliceData[]; totalLabel: string }) {
     const total = slices.reduce((s, sl) => s + sl.value, 0);
     const R = 48;
     const strokeWidth = 16;
@@ -133,23 +184,19 @@ function PieChart({ slices }: { slices: SliceData[] }) {
             return path;
         });
 
-    const availablePct = total > 0
-        ? Math.round((slices.find(s => s.key === "available")?.value ?? 0) / total * 100)
-        : 0;
-
     return (
         <svg width="130" height="130" viewBox="0 0 130 130">
             <circle cx={cx} cy={cy} r={R} fill="none" stroke="var(--color-border)" strokeWidth={strokeWidth} />
             {paths}
-            <text x={cx} y={cy - 4} textAnchor="middle" fontSize="13" fontWeight="700"
-                fill="var(--color-text-primary)"
-                style={{ transform: "rotate(90deg)", transformOrigin: `${cx}px ${cy}px` }}>
-                {availablePct}%
-            </text>
-            <text x={cx} y={cy + 12} textAnchor="middle" fontSize="10"
+            <text x={cx} y={cy - 4} textAnchor="middle" fontSize="10"
                 fill="var(--color-text-secondary)"
                 style={{ transform: "rotate(90deg)", transformOrigin: `${cx}px ${cy}px` }}>
-                khả dụng
+                Chi tiêu
+            </text>
+            <text x={cx} y={cy + 10} textAnchor="middle" fontSize="9"
+                fill="var(--color-text-tertiary)"
+                style={{ transform: "rotate(90deg)", transformOrigin: `${cx}px ${cy}px` }}>
+                {totalLabel}
             </text>
         </svg>
     );
@@ -391,11 +438,12 @@ export const DashboardPage = () => {
     const [balanceHidden, setBalanceHidden] = useState(false);
     const [detailOpen, setDetailOpen]       = useState(false);
 
+    const [cycleStartDay, setCycleStartDay] = useState(1);
     const [selectedYear, setSelectedYear]   = useState(nowDate.getFullYear());
     const [selectedMonth, setSelectedMonth] = useState(nowDate.getMonth() + 1);
 
-    const [cashflow, setCashflow]               = useState<CashflowSummary | null>(null);
-    const [cashflowLoading, setCashflowLoading] = useState(true);
+    const [expBreakdown, setExpBreakdown]           = useState<ExpenseBreakdown | null>(null);
+    const [expBreakdownLoading, setExpBreakdownLoading] = useState(true);
 
     const [detailTx, setDetailTx]           = useState<TxDetail | null>(null);
     const [detailLoading, setDetailLoading] = useState(false);
@@ -413,17 +461,31 @@ export const DashboardPage = () => {
         }
     }, []);
 
-    const loadCashflow = useCallback(async (year: number, month: number) => {
-        setCashflowLoading(true);
-        try { setCashflow(await dashboardApi.getCashflow(year, month)); }
-        catch { setCashflow(null); }
-        finally { setCashflowLoading(false); }
+    const loadExpBreakdown = useCallback(async (year: number, month: number, cycleDay: number) => {
+        setExpBreakdownLoading(true);
+        const { startDate, endDate } = getCycleDates(year, month, cycleDay);
+        try { setExpBreakdown(await dashboardApi.getExpenseBreakdown(startDate, endDate)); }
+        catch { setExpBreakdown(null); }
+        finally { setExpBreakdownLoading(false); }
+    }, []);
+
+    // Load settings to get cycleStartDay, then correct selected month if needed
+    useEffect(() => {
+        settingsApi.getSettings().then((s) => {
+            const day = s.preferences?.cycleStartDay ?? 1;
+            setCycleStartDay(day);
+            if (day > 1) {
+                const { year, month } = getCurrentCycleMonth(day);
+                setSelectedYear(year);
+                setSelectedMonth(month);
+            }
+        }).catch(() => { /* use default cycleStartDay=1 */ });
     }, []);
 
     useEffect(() => { loadDashboard(); }, [loadDashboard]);
     useEffect(() => {
-        loadCashflow(selectedYear, selectedMonth);
-    }, [selectedYear, selectedMonth, loadCashflow]);
+        loadExpBreakdown(selectedYear, selectedMonth, cycleStartDay);
+    }, [selectedYear, selectedMonth, cycleStartDay, loadExpBreakdown]);
 
     /* ── Open transaction detail ── */
     async function openTxDetail(id: string) {
@@ -461,40 +523,40 @@ export const DashboardPage = () => {
 
     /* ── Derived values ── */
     const summary  = data?.summary;
-    const currency = data?.displayCurrency ?? cashflow?.currency ?? summary?.currency ?? "VND";
+    const currency = data?.displayCurrency ?? expBreakdown?.currency ?? summary?.currency ?? "VND";
 
-    const cfIncome     = cashflow?.income     ?? 0;
-    const cfExpense    = cashflow?.expense    ?? 0;
-    const cfInvestment = cashflow?.investment ?? 0;
-    const cfSaving     = cashflow?.saving     ?? 0;
-    const cfAvailable  = Math.max(0, cfIncome - cfExpense - cfInvestment - cfSaving);
+    const expCategories = expBreakdown?.categories ?? [];
+    const expTotal = expCategories.reduce((s, c) => s + c.amount, 0);
+    // Assign palette colors and compute percentages
+    const expSlices: SliceData[] = expCategories.map((cat, i) => ({
+        key:   cat.categoryId,
+        label: cat.name,
+        value: cat.amount,
+        color: CAT_PALETTE[i % CAT_PALETTE.length],
+        icon:  cat.icon,
+    }));
 
     const income     = summary?.income     ?? 0;
     const expense    = summary?.expense    ?? 0;
     const investment = summary?.investment ?? 0;
     const saving     = summary?.saving     ?? 0;
-    const available  = income - expense - investment - saving;
+    // Use the pre-computed all-time balance from accounts.balance (recalculated on every transaction change)
+    const available  = summary?.balance ?? 0;
 
-    const now = new Date();
-    const isCurrentMonth = selectedYear === now.getFullYear() && selectedMonth === now.getMonth() + 1;
+    const currentCycle = getCurrentCycleMonth(cycleStartDay);
+    const isCurrentCycle = selectedYear === currentCycle.year && selectedMonth === currentCycle.month;
+    const cycleDates = getCycleDates(selectedYear, selectedMonth, cycleStartDay);
 
     function prevMonth() {
         if (selectedMonth === 1) { setSelectedYear(selectedYear - 1); setSelectedMonth(12); }
         else { setSelectedMonth(selectedMonth - 1); }
     }
     function nextMonth() {
-        if (isCurrentMonth) return;
+        if (isCurrentCycle) return;
         if (selectedMonth === 12) { setSelectedYear(selectedYear + 1); setSelectedMonth(1); }
         else { setSelectedMonth(selectedMonth + 1); }
     }
 
-    const slices: SliceData[] = [
-        { key: "expense",    label: "Chi tiêu",  value: cfExpense,    color: SLICE_COLORS.expense },
-        { key: "investment", label: "Đầu tư",    value: cfInvestment, color: SLICE_COLORS.investment },
-        { key: "saving",     label: "Tiết kiệm", value: cfSaving,     color: SLICE_COLORS.saving },
-        { key: "available",  label: "Khả dụng",  value: cfAvailable,  color: SLICE_COLORS.available },
-    ];
-    const sliceTotal = cfExpense + cfInvestment + cfSaving + cfAvailable;
 
     /* ── Updated label — based on most recent transaction date ── */
     function getRelativeTimeLabel(isoStr: string): string {
@@ -595,10 +657,19 @@ export const DashboardPage = () => {
                     )}
                 </section>
 
-                {/* ── Cash flow section ── */}
+                {/* ── Expense breakdown section ── */}
                 <section>
                     <div className="cashflow-section__header">
-                        <span className="cashflow-section__title">Thống kê dòng tiền trong tháng</span>
+                        <div className="cashflow-section__title-group">
+                            <span className="cashflow-section__title">
+                                {cycleStartDay > 1 ? "Chi tiêu theo chu kỳ" : "Chi tiêu trong tháng"}
+                            </span>
+                            {cycleStartDay > 1 && (
+                                <span className="cashflow-section__cycle-range">
+                                    {shortDate(cycleDates.startDate)} – {shortDate(cycleDates.endDate)}
+                                </span>
+                            )}
+                        </div>
                         <div className="month-picker">
                             <button className="month-picker__nav" onClick={prevMonth} aria-label="Tháng trước">
                                 <Icon name="chevron_left" size={14} />
@@ -608,7 +679,7 @@ export const DashboardPage = () => {
                             <button
                                 className="month-picker__nav"
                                 onClick={nextMonth}
-                                disabled={isCurrentMonth}
+                                disabled={isCurrentCycle}
                                 aria-label="Tháng sau"
                             >
                                 <Icon name="chevron_right" size={14} />
@@ -617,39 +688,69 @@ export const DashboardPage = () => {
                     </div>
 
                     <div className="piechart-card">
-                        <div className="piechart-card__chart-row">
-                            <div className="piechart-card__chart">
-                                {cashflowLoading
-                                    ? <div className="piechart-card__chart-skeleton skeleton" />
-                                    : <PieChart slices={slices} />
-                                }
+                        {expBreakdownLoading ? (
+                            <div className="piechart-card__chart-row">
+                                <div className="piechart-card__chart-skeleton skeleton" />
+                                <div className="piechart-card__legend" style={{ gap: "var(--space-3)" }}>
+                                    {[1, 2, 3].map((i) => (
+                                        <div key={i} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                            <span className="skeleton" style={{ width: 8, height: 8, borderRadius: "50%", flexShrink: 0 }} />
+                                            <span className="skeleton" style={{ flex: 1, height: 12 }} />
+                                        </div>
+                                    ))}
+                                </div>
                             </div>
-                            <div className="piechart-card__legend">
-                                {slices.map((sl) => {
-                                    const pct = sliceTotal > 0 ? Math.round((sl.value / sliceTotal) * 100) : 0;
-                                    const isZero = sl.value === 0;
-                                    return (
-                                        <div key={sl.key} className="legend-item">
-                                            <div className="legend-item__left">
-                                                <span className="legend-item__dot"
-                                                    style={{ background: isZero ? "var(--color-text-tertiary)" : sl.color }} />
-                                                <span className={`legend-item__label${isZero ? " legend-item__label--zero" : " legend-item__label--active"}`}>
-                                                    {sl.label}
+                        ) : expSlices.length === 0 ? (
+                            <div className="exp-breakdown-empty">
+                                <Icon name="receipt_long" size={32} />
+                                <span>Chưa có chi tiêu trong kỳ này</span>
+                            </div>
+                        ) : (
+                            <div className="piechart-card__chart-row">
+                                <div className="piechart-card__chart">
+                                    <PieChart
+                                        slices={expSlices}
+                                        totalLabel={formatCurrency(expTotal, currency)}
+                                    />
+                                </div>
+                                <div className="piechart-card__legend">
+                                    {expSlices.slice(0, 5).map((sl) => {
+                                        const pct = expTotal > 0 ? Math.round((sl.value / expTotal) * 1000) / 10 : 0;
+                                        return (
+                                            <div key={sl.key} className="legend-item">
+                                                <div className="legend-item__left">
+                                                    <span className="legend-item__dot" style={{ background: sl.color }} />
+                                                    <span className="legend-item__label legend-item__label--active">
+                                                        {sl.label}
+                                                    </span>
+                                                </div>
+                                                <span className="legend-item__pct"
+                                                    style={{ color: sl.color, fontWeight: "var(--weight-bold)" as React.CSSProperties["fontWeight"] }}>
+                                                    {pct}%
                                                 </span>
                                             </div>
-                                            <span className="legend-item__pct"
-                                                style={{ color: isZero ? "var(--color-text-tertiary)" : sl.color, fontWeight: isZero ? undefined : "var(--weight-bold)" as React.CSSProperties["fontWeight"] }}>
-                                                {pct}%
+                                        );
+                                    })}
+                                    {expSlices.length > 5 && (
+                                        <div className="legend-item">
+                                            <div className="legend-item__left">
+                                                <span className="legend-item__dot" style={{ background: "var(--color-text-tertiary)" }} />
+                                                <span className="legend-item__label legend-item__label--zero">
+                                                    +{expSlices.length - 5} khác
+                                                </span>
+                                            </div>
+                                            <span className="legend-item__pct" style={{ color: "var(--color-text-tertiary)" }}>
+                                                {expTotal > 0 ? Math.round((expSlices.slice(5).reduce((s, sl) => s + sl.value, 0) / expTotal) * 1000) / 10 : 0}%
                                             </span>
                                         </div>
-                                    );
-                                })}
+                                    )}
+                                </div>
                             </div>
-                        </div>
+                        )}
                         <div className="piechart-card__income-row">
-                            <span className="piechart-card__income-label">Tổng thu nhập</span>
-                            <span className="piechart-card__income-val">
-                                {cashflowLoading ? "—" : formatCurrency(cfIncome, currency)}
+                            <span className="piechart-card__income-label">Tổng chi tiêu</span>
+                            <span className="piechart-card__income-val" style={{ color: "var(--color-expense)" }}>
+                                {expBreakdownLoading ? "—" : formatCurrency(expTotal, currency)}
                             </span>
                         </div>
                     </div>

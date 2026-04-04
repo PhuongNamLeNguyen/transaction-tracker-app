@@ -80,6 +80,7 @@ export const AddTransactionPage = () => {
     const [dateOpen, setDateOpen]             = useState(false);
     const [calYear, setCalYear]               = useState(() => new Date().getFullYear());
     const [calMonth, setCalMonth]             = useState(() => new Date().getMonth() + 1);
+    const noteRef                             = useRef<HTMLTextAreaElement>(null);
 
     useEffect(() => {
         settingsApi.getSettings().then(async (s) => {
@@ -112,6 +113,9 @@ export const AddTransactionPage = () => {
     const isValid = parsedAmount > 0 && selectedCatId !== null;
     const cfg = TYPE_CONFIG[type];
     const currencyLabel = accountCurrency === "VND" ? "đ" : accountCurrency;
+    const amountPresets = accountCurrency === "VND"
+        ? [10000, 20000, 50000, 100000, 200000, 500000]
+        : [5, 10, 20, 50, 100, 200];
 
     /* ─── Calendar helpers ─── */
     const todayStr = todayIso();
@@ -210,11 +214,36 @@ export const AddTransactionPage = () => {
                             className="atx-amount-input"
                             value={formatWithDots(rawAmount)}
                             onChange={(e) => setRawAmount(e.target.value.replace(/\D/g, ""))}
-                            placeholder="50.000"
+                            placeholder="0"
                             inputMode="numeric"
                             autoFocus
                             style={{ caretColor: cfg.color }}
                         />
+                        {rawAmount ? (
+                            <button
+                                type="button"
+                                className="atx-amount-clear"
+                                onClick={() => setRawAmount("")}
+                                aria-label="Xóa số tiền"
+                            >
+                                <Icon name="cancel" size={18} />
+                            </button>
+                        ) : (
+                            <span className="atx-amount-currency">{currencyLabel}</span>
+                        )}
+                    </div>
+                    <div className="atx-presets">
+                        {amountPresets.map((p) => (
+                            <button
+                                key={p}
+                                type="button"
+                                className={`atx-preset-btn${rawAmount === String(p) ? " atx-preset-btn--active" : ""}`}
+                                style={rawAmount === String(p) ? { borderColor: cfg.color, color: cfg.color } : undefined}
+                                onClick={() => setRawAmount(rawAmount === String(p) ? "" : String(p))}
+                            >
+                                {formatWithDots(String(p))}
+                            </button>
+                        ))}
                     </div>
                 </div>
 
@@ -348,18 +377,32 @@ export const AddTransactionPage = () => {
                 {/* ── Note ── */}
                 <div className="atx-field-group">
                     <label className="atx-label" htmlFor="atx-note">Ghi chú</label>
-                    <div className="atx-field-row">
-                        <Icon name="notes" size={20} style={{ color: "var(--color-text-secondary)" }} />
-                        <input
+                    <div className="atx-field-row atx-field-row--textarea">
+                        <Icon name="notes" size={20} style={{ color: "var(--color-text-secondary)", marginTop: 2, flexShrink: 0 }} />
+                        <textarea
+                            ref={noteRef}
                             id="atx-note"
-                            type="text"
                             className="atx-note-input"
                             value={note}
-                            onChange={(e) => setNote(e.target.value)}
-                            placeholder="Ăn trưa"
+                            onChange={(e) => {
+                                setNote(e.target.value);
+                                if (noteRef.current) {
+                                    noteRef.current.style.height = "auto";
+                                    noteRef.current.style.height = noteRef.current.scrollHeight + "px";
+                                }
+                            }}
+                            placeholder="Thêm ghi chú..."
                             maxLength={500}
+                            rows={1}
                         />
                     </div>
+                    {note.length > 0 && (
+                        <div className="atx-note-meta">
+                            <span className={`atx-note-count${note.length >= 450 ? " atx-note-count--warn" : ""}`}>
+                                {note.length}/500
+                            </span>
+                        </div>
+                    )}
                 </div>
 
                 {/* ── Error / Success ── */}

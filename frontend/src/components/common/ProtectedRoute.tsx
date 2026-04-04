@@ -17,7 +17,6 @@ const LoadingScreen = () => (
             flexDirection: "column",
             alignItems: "center",
             justifyContent: "center",
-            gap: "24px",
         }}
     >
         <div style={{ position: "relative", width: "90px", height: "80px" }}>
@@ -39,14 +38,10 @@ const LoadingScreen = () => (
             ))}
         </div>
 
-        <p
-            style={{
-                fontSize: "var(--text-sm)",
-                color: "var(--color-text-secondary)",
-                margin: 0,
-            }}
-        >
-            Đang kiểm tra phiên đăng nhập...
+        <p className="ls-label">
+            Đang tải<span className="ls-dots">
+                <span>.</span><span>.</span><span>.</span>
+            </span>
         </p>
 
         <style>{`
@@ -69,9 +64,54 @@ const LoadingScreen = () => (
                 66%, 99.9% { opacity: 1; }
                 100%       { opacity: 0; }
             }
+
+            /* Label badge */
+            .ls-label {
+                margin: 40px 0 0;
+                font-size: 11px;
+                font-family: var(--font-sans);
+                font-weight: var(--weight-medium);
+                color: var(--color-text-secondary);
+                letter-spacing: 0.02em;
+                padding: 5px 14px;
+                border: 1.5px solid var(--color-border);
+                border-radius: 999px;
+                background: var(--color-surface);
+                animation: ls-label-in 0.5s var(--ease-decelerate, cubic-bezier(0,0,0.2,1)) 0.2s both,
+                           ls-label-border 2.4s ease-in-out 0.7s infinite;
+            }
+
+            /* Animated dots */
+            .ls-dots span {
+                opacity: 0;
+                animation: ls-dot 1.2s ease-in-out infinite;
+            }
+            .ls-dots span:nth-child(1) { animation-delay: 0s; }
+            .ls-dots span:nth-child(2) { animation-delay: 0.2s; }
+            .ls-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+            @keyframes ls-dot {
+                0%, 60%, 100% { opacity: 0; }
+                30%           { opacity: 1; }
+            }
+
+            /* Label entrance */
+            @keyframes ls-label-in {
+                from { opacity: 0; transform: translateY(8px); }
+                to   { opacity: 1; transform: translateY(0); }
+            }
+
+            /* Border pulse */
+            @keyframes ls-label-border {
+                0%, 100% { border-color: var(--color-border); }
+                50%      { border-color: var(--color-text-tertiary); }
+            }
+
             @media (prefers-reduced-motion: reduce) {
                 .ls-cat-0 { opacity: 1; animation: none; }
                 .ls-cat-1, .ls-cat-2 { opacity: 0; animation: none; }
+                .ls-label { animation: none; opacity: 1; }
+                .ls-dots span { opacity: 1; animation: none; }
             }
         `}</style>
     </div>

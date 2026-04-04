@@ -137,20 +137,33 @@ export const dashboardController = {
         });
     }),
 
-    /** GET /dashboard/expense-breakdown?year=&month= */
+    /** GET /dashboard/expense-breakdown?startDate=&endDate= (cycle-based)
+     *  Fallback: ?year=&month= for calendar month queries */
     getExpenseBreakdown: asyncHandler(async (req: Request, res: Response) => {
         const userId = req.user!.id;
-        const now = new Date();
-        const year  = parseInt(req.query.year  as string) || now.getFullYear();
-        const month = parseInt(req.query.month as string) || now.getMonth() + 1;
 
-        if (month < 1 || month > 12) throw new AppError("Invalid month", 400, "VALIDATION_ERROR");
+        const startDateParam = req.query.startDate as string | undefined;
+        const endDateParam   = req.query.endDate   as string | undefined;
 
-        const [rows, displayCurrency] = await Promise.all([
-            dashboardRepo.getExpenseBreakdownByMonth(userId, year, month),
-            dashboardRepo.getDisplayCurrency(userId),
-        ]);
+        let rows: Array<{ category_id: string; category_name: string; category_icon: string | null; total: string }>;
 
+        if (startDateParam && endDateParam) {
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(startDateParam) || !/^\d{4}-\d{2}-\d{2}$/.test(endDateParam)) {
+                throw new AppError("Invalid date format", 400, "VALIDATION_ERROR");
+            }
+            if (startDateParam > endDateParam) {
+                throw new AppError("startDate must be before endDate", 400, "VALIDATION_ERROR");
+            }
+            rows = await dashboardRepo.getExpenseBreakdownByDateRange(userId, startDateParam, endDateParam);
+        } else {
+            const now   = new Date();
+            const year  = parseInt(req.query.year  as string) || now.getFullYear();
+            const month = parseInt(req.query.month as string) || now.getMonth() + 1;
+            if (month < 1 || month > 12) throw new AppError("Invalid month", 400, "VALIDATION_ERROR");
+            rows = await dashboardRepo.getExpenseBreakdownByMonth(userId, year, month);
+        }
+
+        const displayCurrency = await dashboardRepo.getDisplayCurrency(userId);
         const rate = await getRate("VND", displayCurrency);
 
         const categories = rows.map((r) => ({
@@ -164,20 +177,34 @@ export const dashboardController = {
         sendSuccess(res, { categories, currency: displayCurrency });
     }),
 
-    /** GET /dashboard/cashflow?year=&month= */
+    /** GET /dashboard/cashflow?startDate=&endDate= (cycle-based)
+     *  Fallback: ?year=&month= for calendar month queries */
     getCashflow: asyncHandler(async (req: Request, res: Response) => {
         const userId = req.user!.id;
-        const now = new Date();
-        const year  = parseInt(req.query.year  as string) || now.getFullYear();
-        const month = parseInt(req.query.month as string) || now.getMonth() + 1;
 
-        if (month < 1 || month > 12) throw new AppError("Invalid month", 400, "VALIDATION_ERROR");
+        const startDateParam = req.query.startDate as string | undefined;
+        const endDateParam   = req.query.endDate   as string | undefined;
 
-        const [summaryRows, displayCurrency] = await Promise.all([
-            dashboardRepo.getSummaryByMonth(userId, year, month),
-            dashboardRepo.getDisplayCurrency(userId),
-        ]);
+        let summaryRows: Array<{ type: string; total: string }>;
 
+        if (startDateParam && endDateParam) {
+            // Validate ISO date format (YYYY-MM-DD)
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(startDateParam) || !/^\d{4}-\d{2}-\d{2}$/.test(endDateParam)) {
+                throw new AppError("Invalid date format", 400, "VALIDATION_ERROR");
+            }
+            if (startDateParam > endDateParam) {
+                throw new AppError("startDate must be before endDate", 400, "VALIDATION_ERROR");
+            }
+            summaryRows = await dashboardRepo.getSummaryByDateRange(userId, startDateParam, endDateParam);
+        } else {
+            const now   = new Date();
+            const year  = parseInt(req.query.year  as string) || now.getFullYear();
+            const month = parseInt(req.query.month as string) || now.getMonth() + 1;
+            if (month < 1 || month > 12) throw new AppError("Invalid month", 400, "VALIDATION_ERROR");
+            summaryRows = await dashboardRepo.getSummaryByMonth(userId, year, month);
+        }
+
+        const displayCurrency = await dashboardRepo.getDisplayCurrency(userId);
         const rate = await getRate("VND", displayCurrency);
 
         const cashflow: Record<string, number | string> = {

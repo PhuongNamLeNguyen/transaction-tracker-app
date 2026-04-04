@@ -107,6 +107,30 @@ export const dashboardRepo = {
         return (result.rows[0]?.target_currency as string) ?? "VND";
     },
 
+    /* ─── Expense category breakdown for an explicit date range (cycle-based) ─── */
+    getExpenseBreakdownByDateRange: async (userId: string, startDate: string, endDate: string) => {
+        const result = await query(
+            `SELECT
+               c.id   AS category_id,
+               c.name AS category_name,
+               c.icon AS category_icon,
+               SUM(ts.amount) AS total
+             FROM   transaction_splits ts
+             JOIN   transactions t ON ts.transaction_id = t.id
+             JOIN   categories   c ON ts.category_id    = c.id
+             WHERE  t.user_id    = $1
+               AND  t.type       = 'expense'
+               AND  t.status     = 'confirmed'
+               AND  t.deleted_at IS NULL
+               AND  ts.deleted_at IS NULL
+               AND  t.transaction_date::date BETWEEN $2::date AND $3::date
+             GROUP BY c.id, c.name, c.icon
+             ORDER BY total DESC`,
+            [userId, startDate, endDate],
+        );
+        return result.rows;
+    },
+
     /* ─── Expense category breakdown for a calendar month ─── */
     getExpenseBreakdownByMonth: async (userId: string, year: number, month: number) => {
         const result = await query(
@@ -144,6 +168,21 @@ export const dashboardRepo = {
                AND  EXTRACT(MONTH FROM t.transaction_date) = $3
              GROUP BY t.type`,
             [userId, year, month],
+        );
+        return result.rows as Array<{ type: string; total: string }>;
+    },
+
+    /* ─── Type totals for an explicit date range (cycle-based) ─── */
+    getSummaryByDateRange: async (userId: string, startDate: string, endDate: string) => {
+        const result = await query(
+            `SELECT t.type, SUM(t.amount) AS total
+             FROM   transactions t
+             WHERE  t.user_id         = $1
+               AND  t.status          = 'confirmed'
+               AND  t.deleted_at      IS NULL
+               AND  t.transaction_date::date BETWEEN $2::date AND $3::date
+             GROUP BY t.type`,
+            [userId, startDate, endDate],
         );
         return result.rows as Array<{ type: string; total: string }>;
     },

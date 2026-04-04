@@ -106,8 +106,8 @@ export const dashboardApi = {
         return (await res.json()).data;
     },
 
-    async getExpenseBreakdown(year: number, month: number): Promise<ExpenseBreakdown> {
-        const res = await fetch(`${BASE}/dashboard/expense-breakdown?year=${year}&month=${month}`, {
+    async getExpenseBreakdown(startDate: string, endDate: string): Promise<ExpenseBreakdown> {
+        const res = await fetch(`${BASE}/dashboard/expense-breakdown?startDate=${startDate}&endDate=${endDate}`, {
             headers: authHeaders(),
             credentials: "include",
         });
@@ -115,8 +115,8 @@ export const dashboardApi = {
         return (await res.json()).data;
     },
 
-    async getCashflow(year: number, month: number): Promise<CashflowSummary> {
-        const res = await fetch(`${BASE}/dashboard/cashflow?year=${year}&month=${month}`, {
+    async getCashflow(startDate: string, endDate: string): Promise<CashflowSummary> {
+        const res = await fetch(`${BASE}/dashboard/cashflow?startDate=${startDate}&endDate=${endDate}`, {
             headers: authHeaders(),
             credentials: "include",
         });

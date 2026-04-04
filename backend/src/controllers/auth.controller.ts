@@ -57,7 +57,9 @@ export const authController = {
 
         const cookieOptions = {
             ...baseCookieOptions,
-            ...(result.rememberMe ? { maxAge: 30 * 24 * 60 * 60 * 1000 } : {}),
+            maxAge: result.rememberMe
+                ? 30 * 24 * 60 * 60 * 1000  // 30 days
+                : 24 * 60 * 60 * 1000,        // 1 day (still persists across browser restarts)
         };
 
         res.cookie("refresh_token", result.refreshToken, cookieOptions);
