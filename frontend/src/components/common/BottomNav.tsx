@@ -130,7 +130,7 @@ export const BottomNav = () => {
         const file = e.target.files?.[0];
         if (file && pendingTypeRef.current) {
             const isPdf = file.type === "application/pdf";
-            const dest = isPdf ? "/receipt-review" : "/image-crop";
+            const dest = "/receipt-review";
             navigate(dest, { state: { file, type: pendingTypeRef.current } });
         }
         // Reset so the same file can be re-selected
