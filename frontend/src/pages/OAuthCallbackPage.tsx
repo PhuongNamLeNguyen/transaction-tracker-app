@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { setToken } from "@/utils/token-utils";
+import { setRefreshToken } from "@/utils/refresh-token-utils";
 import { useAuth } from "@/hooks/useAuth";
 import { Icon } from "@/components/common/Icon";
 
@@ -12,6 +13,7 @@ export const OAuthCallbackPage = () => {
         const hash = window.location.hash.substring(1);
         const params = new URLSearchParams(hash);
         const accessToken = params.get("access_token");
+        const refreshToken = params.get("refresh_token");
         const userStr = params.get("user");
 
         if (!accessToken || !userStr) {
@@ -22,6 +24,9 @@ export const OAuthCallbackPage = () => {
         try {
             const user = JSON.parse(atob(userStr.replace(/-/g, "+").replace(/_/g, "/")));
             setToken(accessToken);
+            // Store refresh token as sessionStorage fallback for browsers (iOS Safari)
+            // that block cross-site HttpOnly cookies.
+            if (refreshToken) setRefreshToken(refreshToken);
             login(user);
             navigate("/", { replace: true });
         } catch {

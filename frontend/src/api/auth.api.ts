@@ -1,4 +1,5 @@
 import { getToken } from "@/utils/token-utils";
+import { getRefreshToken, setRefreshToken } from "@/utils/refresh-token-utils";
 import { config } from "@/utils/config";
 
 const BASE = config.apiBaseUrl;
@@ -52,9 +53,10 @@ export interface RegisterResponse {
     name: string;
 }
 
-/** Trả về sau refresh — refreshToken được rotate vào HttpOnly cookie */
+/** Trả về sau refresh — refreshToken được rotate vào HttpOnly cookie + body fallback */
 export interface RefreshResponse {
     accessToken: string;
+    refreshToken?: string; // included so mobile can update sessionStorage fallback
     user: {
         id: string;
         email: string;
@@ -119,20 +121,29 @@ export const authApi = {
 
     /**
      * POST /auth/refresh
-     * Backend: authService.refresh(rawRefreshToken, userId)
-     * Cookie HttpOnly tự động gửi lên — FE không cần đọc refresh token
-     * Returns: { accessToken, refreshToken, user }
+     * Primary: sends HttpOnly cookie automatically via credentials:"include".
+     * Fallback: if cookie is blocked (iOS Safari ITP), sends stored refresh token
+     *           in the request body instead.
+     * Returns: { accessToken, refreshToken?, user }
      */
     async refresh(): Promise<RefreshResponse> {
         if (refreshInFlight) return refreshInFlight;
+
+        const storedToken = getRefreshToken();
+        const body = storedToken ? JSON.stringify({ refresh_token: storedToken }) : undefined;
+
         refreshInFlight = fetch(`${BASE}/auth/refresh`, {
             method: "POST",
             headers: jsonHeaders(),
             credentials: "include",
+            body,
         })
             .then(async (res) => {
                 if (!res.ok) throw await res.json();
-                return (await res.json()).data as RefreshResponse;
+                const data = (await res.json()).data as RefreshResponse;
+                // Keep sessionStorage fallback in sync with the rotated token.
+                if (data.refreshToken) setRefreshToken(data.refreshToken);
+                return data;
             })
             .finally(() => {
                 refreshInFlight = null;

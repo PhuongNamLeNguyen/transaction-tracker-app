@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
     AuthContext,
     type AuthUser,
@@ -7,11 +7,15 @@ import {
 import { authApi, type RefreshResponse } from "@/api/auth.api";
 import { onboardingApi } from "@/api/onboarding.api";
 import { setToken, clearToken } from "@/utils/token-utils";
+import { clearRefreshToken } from "@/utils/refresh-token-utils";
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const [user, setUser] = useState<AuthUser | null>(null);
     const [status, setStatus] = useState<AuthStatus>("loading");
     const [isOnboarded, setIsOnboarded] = useState<boolean | null>(null);
+    // Tracks whether login() was called explicitly (e.g. OAuth callback, manual login).
+    // Prevents silentRefresh from overriding authenticated state if it completes later.
+    const wasManuallyLoggedIn = useRef(false);
 
     /* ── Kiểm tra onboarding status sau khi có access token ──
        Nếu API không tồn tại (chưa deploy) → fallback assume đã onboard
@@ -45,6 +49,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
                 setStatus("authenticated");
             } catch {
                 if (cancelled) return;
+                // If login() was called in the meantime (e.g. OAuth callback),
+                // don't override the authenticated state with the failed refresh.
+                if (wasManuallyLoggedIn.current) return;
                 clearToken();
                 setUser(null);
                 setIsOnboarded(null);
@@ -65,6 +72,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     */
     const login = useCallback(
         (authUser: AuthUser) => {
+            wasManuallyLoggedIn.current = true;
             setUser(authUser);
             setIsOnboarded(null); // unknown until checked
             setStatus("authenticated");
@@ -87,6 +95,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             // Bỏ qua lỗi network — vẫn clear local state
         } finally {
             clearToken();
+            clearRefreshToken();
             setUser(null);
             setIsOnboarded(null);
             setStatus("unauthenticated");

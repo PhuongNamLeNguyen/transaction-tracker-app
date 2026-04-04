@@ -69,7 +69,10 @@ export const authController = {
     }),
 
     refresh: asyncHandler(async (req: Request, res: Response) => {
-        const rawToken = req.cookies?.[REFRESH_COOKIE_NAME];
+        // Primary: HttpOnly cookie (set on login/OAuth callback).
+        // Fallback: request body token — used by mobile browsers (iOS Safari) that
+        // block cross-site cookies. Both point to the same session in the DB.
+        const rawToken = req.cookies?.[REFRESH_COOKIE_NAME] ?? req.body?.refresh_token;
         if (!rawToken) {
             throw Object.assign(new Error("Refresh token missing"), {
                 statusCode: 401,
@@ -80,7 +83,9 @@ export const authController = {
         const { accessToken, refreshToken, user } = await authService.refresh(rawToken);
 
         res.cookie(REFRESH_COOKIE_NAME, refreshToken, COOKIE_OPTIONS);
-        sendSuccess(res, { accessToken, user });
+        // Return the new refresh token in the body so the frontend can update
+        // its sessionStorage fallback regardless of whether the cookie was accepted.
+        sendSuccess(res, { accessToken, refreshToken, user });
     }),
 
     logout: asyncHandler(async (req: Request, res: Response) => {
@@ -141,9 +146,11 @@ export const authController = {
 
             res.cookie("refresh_token", result.refreshToken, COOKIE_OPTIONS);
 
+            // Also pass refresh_token in the hash so mobile browsers that block
+            // cross-site HttpOnly cookies (iOS Safari ITP) can store it as a fallback.
             const userEncoded = Buffer.from(JSON.stringify(result.user)).toString("base64url");
             res.redirect(
-                `${env.frontendUrl}/oauth/callback#access_token=${result.accessToken}&user=${userEncoded}`,
+                `${env.frontendUrl}/oauth/callback#access_token=${result.accessToken}&refresh_token=${result.refreshToken}&user=${userEncoded}`,
             );
         } catch {
             res.redirect(`${env.frontendUrl}/login?error=oauth_failed`);
