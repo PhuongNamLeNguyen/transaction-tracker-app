@@ -16,6 +16,10 @@ export const env = {
     googleClientSecret: process.env.GOOGLE_CLIENT_SECRET ?? "",
     googleRedirectUri: process.env.GOOGLE_REDIRECT_URI ?? "http://localhost:3000/api/v1/auth/google/callback",
     frontendUrl: process.env.FRONTEND_URL ?? "http://localhost:5173",
+    // Cloudinary (receipt image storage)
+    cloudinaryCloudName: process.env.CLOUDINARY_CLOUD_NAME ?? "",
+    cloudinaryApiKey:    process.env.CLOUDINARY_API_KEY ?? "",
+    cloudinaryApiSecret: process.env.CLOUDINARY_API_SECRET ?? "",
     // Resend email service (fallback)
     resendApiKey: process.env.RESEND_API_KEY ?? "",
     fromEmail: process.env.FROM_EMAIL ?? "onboarding@resend.dev",

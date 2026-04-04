@@ -1,36 +1,17 @@
 import { Request, Response } from "express";
 import path from "path";
-import fs from "fs";
 import multer from "multer";
 import { asyncHandler } from "../utils/asyncHandler";
 import { sendSuccess } from "../utils/response";
 import { AppError } from "../utils/AppError";
 import { receiptsRepo } from "../repositories/receipts.repo";
 import { parseReceiptWithCategories } from "../services/ai.service";
+import { uploadToCloudinary } from "../config/cloudinary";
 
-/* ─── Multer config: disk storage ─── */
+/* ─── Multer config: memory storage (no local disk, works on Railway) ─── */
 
 const ALLOWED_MIMES = ["image/jpeg", "image/jpg", "image/png", "image/heic", "application/pdf"];
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
-
-const storage = multer.diskStorage({
-    destination: (_req, _file, cb) => {
-        const dir = path.join(process.cwd(), "uploads", "receipts");
-        fs.mkdirSync(dir, { recursive: true });
-        cb(null, dir);
-    },
-    filename: (_req, file, cb) => {
-        const MIME_TO_EXT: Record<string, string> = {
-            "image/jpeg": ".jpg",
-            "image/jpg": ".jpg",
-            "image/png": ".png",
-            "image/heic": ".heic",
-            "application/pdf": ".pdf",
-        };
-        const ext = MIME_TO_EXT[file.mimetype] ?? ".jpg";
-        cb(null, `${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`);
-    },
-});
 
 const fileFilter: multer.Options["fileFilter"] = (_req, file, cb) => {
     if (ALLOWED_MIMES.includes(file.mimetype)) {
@@ -46,11 +27,15 @@ const fileFilter: multer.Options["fileFilter"] = (_req, file, cb) => {
     }
 };
 
-export const receiptUpload = multer({ storage, fileFilter, limits: { fileSize: MAX_FILE_SIZE } });
+export const receiptUpload = multer({
+    storage: multer.memoryStorage(),
+    fileFilter,
+    limits: { fileSize: MAX_FILE_SIZE },
+});
 
 /* ─── Helpers ─── */
 
-function getMimeType(filePath: string): string {
+function getMimeType(originalname: string, mimetype: string): string {
     const map: Record<string, string> = {
         ".jpg": "image/jpeg",
         ".jpeg": "image/jpeg",
@@ -58,12 +43,7 @@ function getMimeType(filePath: string): string {
         ".heic": "image/jpeg", // treat as JPEG for Claude (best effort)
         ".pdf": "application/pdf",
     };
-    return map[path.extname(filePath).toLowerCase()] ?? "image/jpeg";
-}
-
-function buildImageUrl(filename: string): string {
-    const base = process.env.BASE_URL ?? `http://localhost:${process.env.PORT ?? 3000}`;
-    return `${base}/uploads/receipts/${filename}`;
+    return map[path.extname(originalname).toLowerCase()] ?? mimetype ?? "image/jpeg";
 }
 
 /** Build the TransactionSuggestion from AI output and DB writes */
@@ -181,7 +161,9 @@ export const receiptsController = {
             throw new AppError("No image file provided", 400, "VALIDATION_ERROR");
         }
 
-        const imageUrl = buildImageUrl(req.file.filename);
+        // Upload to Cloudinary — persistent cloud storage, works on Railway
+        const mimeType = getMimeType(req.file.originalname, req.file.mimetype);
+        const imageUrl = await uploadToCloudinary(req.file.buffer, mimeType);
         const receipt = await receiptsRepo.create(imageUrl);
 
         res.status(201).json({
@@ -208,16 +190,12 @@ export const receiptsController = {
         await receiptsRepo.updateOcrStatus(receiptId, "processing");
 
         try {
-            // Read the image file from disk
-            const filename = path.basename(receipt.image_url);
-            const filePath = path.join(process.cwd(), "uploads", "receipts", filename);
-
-            if (!fs.existsSync(filePath)) {
-                throw new AppError("Image file not found on server", 404, "RESOURCE_NOT_FOUND");
-            }
-
-            const imageBuffer = fs.readFileSync(filePath);
-            const mimeType = getMimeType(filePath);
+            // Download image from Cloudinary URL (replaces old disk read)
+            const fetchRes = await fetch(receipt.image_url);
+            if (!fetchRes.ok) throw new AppError("Image file not found", 404, "RESOURCE_NOT_FOUND");
+            const arrayBuffer = await fetchRes.arrayBuffer();
+            const imageBuffer = Buffer.from(arrayBuffer);
+            const mimeType = getMimeType(receipt.image_url, "image/jpeg");
 
             // Run AI pipeline
             const { suggestion, confidenceLevel, merchantId, dominantCategoryId } =

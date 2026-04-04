@@ -173,11 +173,13 @@ export const ReceiptReviewPage = () => {
                         setAmount(String(roundAmount(rawAmount * rate, userCur)));
                         setConversionInfo({ original: rawAmount, from: receiptCur, rate });
                     } else {
-                        setAmount(String(roundAmount(rawAmount, userCur)));
+                        // No exchange rate available — show original amount in receipt currency,
+                        // not rounded as userCur (would give wrong number, e.g. 1400 JPY → 1000 VND)
+                        setAmount(String(Math.round(rawAmount)));
                         setConversionInfo(null);
                     }
                 } catch {
-                    setAmount(String(roundAmount(rawAmount, userCur)));
+                    setAmount(String(Math.round(rawAmount)));
                     setConversionInfo(null);
                 }
             } else {

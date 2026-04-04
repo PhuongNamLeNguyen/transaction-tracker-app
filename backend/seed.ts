@@ -1,6 +1,6 @@
 /**
- * seed.ts — Seeds the categories table with default expense/income/etc. categories.
- * Safe to run multiple times — skips if categories already exist.
+ * seed.ts — Seeds categories and exchange_rates tables.
+ * Safe to run multiple times — idempotent on both tables.
  * Usage: npm run seed
  */
 import { Pool } from "pg";
@@ -48,41 +48,94 @@ const SAVING_CATEGORIES = [
 async function seed() {
     const client = await pool.connect();
     try {
-        // Check if already seeded
+        // Categories — skip insert if already populated, but always fall through to exchange rates
         const { rows } = await client.query(
             `SELECT COUNT(*) AS count FROM categories`,
         );
         const count = parseInt(rows[0].count, 10);
         if (count > 0) {
-            console.log(`⚠  categories already has ${count} rows — skipping seed.`);
-            return;
+            console.log(`⚠  categories already has ${count} rows — skipping category seed.`);
+        } else {
+            await client.query("BEGIN");
+
+            const allCategories = [
+                ...EXPENSE_CATEGORIES.map((c) => ({ ...c, type: "expense" })),
+                ...INCOME_CATEGORIES.map((c) => ({ ...c, type: "income" })),
+                ...INVESTMENT_CATEGORIES.map((c) => ({ ...c, type: "investment" })),
+                ...SAVING_CATEGORIES.map((c) => ({ ...c, type: "saving" })),
+            ];
+
+            for (const cat of allCategories) {
+                await client.query(
+                    `INSERT INTO categories (name, type, icon) VALUES ($1, $2, $3)`,
+                    [cat.name, cat.type, cat.icon],
+                );
+            }
+
+            await client.query("COMMIT");
+            console.log(`✅ Seeded ${allCategories.length} categories.`);
         }
 
-        await client.query("BEGIN");
-
-        const allCategories = [
-            ...EXPENSE_CATEGORIES.map((c) => ({ ...c, type: "expense" })),
-            ...INCOME_CATEGORIES.map((c) => ({ ...c, type: "income" })),
-            ...INVESTMENT_CATEGORIES.map((c) => ({ ...c, type: "investment" })),
-            ...SAVING_CATEGORIES.map((c) => ({ ...c, type: "saving" })),
-        ];
-
-        for (const cat of allCategories) {
-            await client.query(
-                `INSERT INTO categories (name, type, icon) VALUES ($1, $2, $3)`,
-                [cat.name, cat.type, cat.icon],
-            );
-        }
-
-        await client.query("COMMIT");
-        console.log(`✅ Seeded ${allCategories.length} categories.`);
+        // Exchange rates — always upsert (idempotent, safe to run on every deploy)
+        await seedExchangeRates(client);
     } catch (err) {
-        await client.query("ROLLBACK");
+        await client.query("ROLLBACK").catch(() => {});
         throw err;
     } finally {
         client.release();
         await pool.end();
     }
+}
+
+/* ─── Exchange rates ──────────────────────────────────────────── */
+
+const EXCHANGE_RATES: { base: string; target: string; rate: number }[] = [
+    // JPY → others
+    { base: "JPY", target: "VND", rate: 160.00 },
+    { base: "JPY", target: "USD", rate: 0.0067 },
+    { base: "JPY", target: "EUR", rate: 0.0061 },
+    { base: "JPY", target: "THB", rate: 0.24 },
+    { base: "JPY", target: "SGD", rate: 0.0089 },
+    { base: "JPY", target: "KRW", rate: 8.80 },
+    { base: "JPY", target: "GBP", rate: 0.0053 },
+    // others → JPY
+    { base: "VND", target: "JPY", rate: 0.00625 },
+    { base: "USD", target: "JPY", rate: 149.50 },
+    { base: "EUR", target: "JPY", rate: 163.00 },
+    { base: "THB", target: "JPY", rate: 4.15 },
+    { base: "SGD", target: "JPY", rate: 112.00 },
+    { base: "KRW", target: "JPY", rate: 0.1136 },
+    { base: "GBP", target: "JPY", rate: 189.00 },
+    // common cross-rates (VND base)
+    { base: "USD", target: "VND", rate: 25300.00 },
+    { base: "VND", target: "USD", rate: 0.0000395 },
+    { base: "EUR", target: "VND", rate: 27500.00 },
+    { base: "VND", target: "EUR", rate: 0.0000364 },
+    { base: "GBP", target: "VND", rate: 32000.00 },
+    { base: "VND", target: "GBP", rate: 0.0000313 },
+    { base: "SGD", target: "VND", rate: 18900.00 },
+    { base: "VND", target: "SGD", rate: 0.0000529 },
+    { base: "THB", target: "VND", rate: 700.00 },
+    { base: "VND", target: "THB", rate: 0.00143 },
+    { base: "KRW", target: "VND", rate: 18.00 },
+    { base: "VND", target: "KRW", rate: 0.0556 },
+    { base: "CNY", target: "VND", rate: 3500.00 },
+    { base: "VND", target: "CNY", rate: 0.000286 },
+    { base: "AUD", target: "VND", rate: 16000.00 },
+    { base: "VND", target: "AUD", rate: 0.0000625 },
+];
+
+async function seedExchangeRates(client: import("pg").PoolClient) {
+    for (const { base, target, rate } of EXCHANGE_RATES) {
+        await client.query(
+            `INSERT INTO exchange_rates (base_currency, target_currency, rate, updated_at)
+             VALUES ($1, $2, $3, now())
+             ON CONFLICT (base_currency, target_currency)
+             DO UPDATE SET rate = EXCLUDED.rate, updated_at = now()`,
+            [base, target, rate],
+        );
+    }
+    console.log(`✅ Seeded ${EXCHANGE_RATES.length} exchange rate pairs.`);
 }
 
 seed().catch((err) => {
