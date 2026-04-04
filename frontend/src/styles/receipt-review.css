@@ -91,6 +91,20 @@
     transition: filter var(--duration-base) var(--ease-standard);
 }
 
+/* Inline image inside the review form */
+.rxv-img-wrap {
+    position: relative;
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    background: var(--color-surface);
+    margin-bottom: var(--space-1);
+}
+
+.rxv-preview-img--inline {
+    max-height: 200px;
+    border-radius: var(--radius-lg);
+}
+
 .rxv-scan-overlay {
     position: absolute;
     inset: 0;
@@ -103,6 +117,13 @@
     font-size: var(--text-base);
     font-weight: var(--weight-semibold);
 }
+
+.rxv-scan-overlay--inline {
+    background: rgba(0, 0, 0, 0.55);
+    font-size: var(--text-sm);
+    gap: var(--space-2);
+}
+
 .rxv-scan-overlay p { margin: 0; }
 
 /* ── Preview footer ── */

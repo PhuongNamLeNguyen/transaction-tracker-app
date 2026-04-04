@@ -9,12 +9,10 @@ import {
 import { settingsApi } from "@/api/settings.api";
 import { exchangeApi } from "@/api/exchange.api";
 import { Icon } from "@/components/common/Icon";
-import "@/styles/transactions.css"; // detail-row, detail-sheet__* classes
+import "@/styles/transactions.css";
 import "@/styles/receipt-review.css";
 
 /* ─── Types ─── */
-type Phase = "preview" | "scanning" | "review";
-
 interface ConversionInfo {
     original: number;
     from: string;
@@ -28,20 +26,14 @@ interface LocationState {
 
 /* ─── Helpers ─── */
 const TYPE_CONFIG: Record<TransactionType, { label: string; color: string }> = {
-    income: { label: "Thu nhập", color: "var(--color-income)" },
-    expense: { label: "Chi tiêu", color: "var(--color-expense)" },
-    investment: { label: "Đầu tư", color: "var(--color-investment)" },
-    saving: { label: "Tiết kiệm", color: "var(--color-saving)" },
+    income:     { label: "Thu nhập",  color: "var(--color-income)" },
+    expense:    { label: "Chi tiêu",  color: "var(--color-expense)" },
+    investment: { label: "Đầu tư",    color: "var(--color-investment)" },
+    saving:     { label: "Tiết kiệm", color: "var(--color-saving)" },
 };
 
-const TX_TYPES: TransactionType[] = [
-    "income",
-    "expense",
-    "investment",
-    "saving",
-];
+const TX_TYPES: TransactionType[] = ["income", "expense", "investment", "saving"];
 
-/** Parse ISO datetime (or date-only) → datetime-local string (YYYY-MM-DDTHH:mm) */
 function isoToDateTimeLocal(iso: string | null): string {
     const now = new Date();
     const currentYear = now.getFullYear();
@@ -52,24 +44,17 @@ function isoToDateTimeLocal(iso: string | null): string {
         return `${date}T${time}`;
     }
 
-    // Handle ISO 8601 partial dates with no year (e.g. "--03-24" or "--03-24T14:46")
     if (iso.startsWith("--")) {
         const withYear = `${currentYear}-${iso.slice(2)}`;
         return withYear.includes("T") ? withYear.slice(0, 16) : `${withYear}T00:00`;
     }
 
     const withTime = iso.includes("T") ? iso.slice(0, 16) : `${iso}T00:00`;
-
-    // If year looks like a placeholder (0000, 0001, etc.), replace with current year
     const year = parseInt(withTime.slice(0, 4), 10);
-    if (year < 100) {
-        return `${currentYear}${withTime.slice(4)}`;
-    }
-
+    if (year < 100) return `${currentYear}${withTime.slice(4)}`;
     return withTime;
 }
 
-/** Round amount to nearest 1000 for VND, else keep as integer */
 function roundAmount(value: number, currency: string): number {
     if (currency === "VND") return Math.round(value / 1000) * 1000;
     return Math.round(value);
@@ -92,40 +77,35 @@ export const ReceiptReviewPage = () => {
         if (!state?.file) navigate("/", { replace: true });
     }, [state, navigate]);
 
-    const file = state?.file ?? null;
+    const file    = state?.file ?? null;
     const initType = state?.type ?? "expense";
 
-    const [phase, setPhase] = useState<Phase>("preview");
     const [imageUrl] = useState<string>(() =>
         file ? URL.createObjectURL(file) : "",
     );
-    const [suggestion, setSuggestion] = useState<TransactionSuggestion | null>(
-        null,
-    );
-    const [categories, setCategories] = useState<TxCategory[]>([]);
 
-    // Editable fields
+    const [scanning, setScanning] = useState(false);
+    const [suggestion, setSuggestion] = useState<TransactionSuggestion | null>(null);
+    const [scanError, setScanError] = useState<string | null>(null);
+
+    const [categories, setCategories] = useState<TxCategory[]>([]);
     const [selectedType, setSelectedType] = useState<TransactionType>(initType);
     const [amount, setAmount] = useState<string>("");
-    const [dateTime, setDateTime] = useState<string>(() =>
-        isoToDateTimeLocal(null),
-    );
+    const [dateTime, setDateTime] = useState<string>(() => isoToDateTimeLocal(null));
     const [note, setNote] = useState("");
     const [merchant, setMerchant] = useState("");
-
     const [selectedCategoryId, setSelectedCategoryId] = useState<string>("");
     const [catOpen, setCatOpen] = useState(false);
     const [catAnchorRect, setCatAnchorRect] = useState<DOMRect | null>(null);
-
-    const dateInputRef = useRef<HTMLInputElement>(null);
-
     const [accountCurrency, setAccountCurrency] = useState("VND");
     const [conversionInfo, setConversionInfo] = useState<ConversionInfo | null>(null);
 
-    const [scanError, setScanError] = useState<string | null>(null);
     const [saving, setSaving] = useState(false);
     const [saveError, setSaveError] = useState<string | null>(null);
     const [saveSuccess, setSaveSuccess] = useState(false);
+
+    const dateInputRef = useRef<HTMLInputElement>(null);
+    const hasScanned = useRef(false);
 
     const loadCategories = useCallback(async (type: TransactionType) => {
         try {
@@ -136,99 +116,91 @@ export const ReceiptReviewPage = () => {
         }
     }, []);
 
+    useEffect(() => { loadCategories(selectedType); }, [loadCategories, selectedType]);
+
+    // Auto-scan on mount
     useEffect(() => {
-        loadCategories(selectedType);
-    }, [loadCategories, selectedType]);
+        if (!file || hasScanned.current) return;
+        hasScanned.current = true;
 
-    async function handleScan() {
-        if (!file) return;
-        setPhase("scanning");
-        setScanError(null);
-        try {
-            const [result, settingsData] = await Promise.all([
-                receiptsApi.uploadAndScan(file, selectedType),
-                settingsApi.getSettings(),
-            ]);
-            const s = result.suggestion;
-            const userCur = (
-                settingsData.account?.currency ??
-                "VND"
-            ).toUpperCase();
-            setAccountCurrency(userCur);
+        (async () => {
+            setScanning(true);
+            setScanError(null);
+            try {
+                const [result, settingsData] = await Promise.all([
+                    receiptsApi.uploadAndScan(file, initType),
+                    settingsApi.getSettings(),
+                ]);
+                const s = result.suggestion;
+                const userCur = (settingsData.account?.currency ?? "VND").toUpperCase();
+                setAccountCurrency(userCur);
+                setSuggestion(s);
+                setDateTime(isoToDateTimeLocal(s.transactionDate));
+                setMerchant(s.merchant?.name ?? "");
+                setNote((s.suggestedNote ?? "").slice(0, 500));
+                setSelectedCategoryId(s.items[0]?.prediction.categoryId ?? "");
 
-            setSuggestion(s);
-            setDateTime(isoToDateTimeLocal(s.transactionDate));
-            setMerchant(s.merchant?.name ?? "");
-            setNote((s.suggestedNote ?? "").slice(0, 500));
-            setSelectedCategoryId(s.items[0]?.prediction.categoryId ?? "");
+                const rawAmount = s.totalAmount;
+                const receiptCur = (s.currency ?? "").toUpperCase();
 
-            // Currency conversion
-            const rawAmount = s.totalAmount;
-            const receiptCur = (s.currency ?? "").toUpperCase();
-
-            if (rawAmount != null && receiptCur && receiptCur !== userCur) {
-                try {
-                    const rate = await exchangeApi.getRate(receiptCur, userCur);
-                    if (rate !== null) {
-                        setAmount(String(roundAmount(rawAmount * rate, userCur)));
-                        setConversionInfo({ original: rawAmount, from: receiptCur, rate });
-                    } else {
-                        // No exchange rate available — show original amount in receipt currency,
-                        // not rounded as userCur (would give wrong number, e.g. 1400 JPY → 1000 VND)
+                if (rawAmount != null && receiptCur && receiptCur !== userCur) {
+                    try {
+                        const rate = await exchangeApi.getRate(receiptCur, userCur);
+                        if (rate !== null) {
+                            setAmount(String(roundAmount(rawAmount * rate, userCur)));
+                            setConversionInfo({ original: rawAmount, from: receiptCur, rate });
+                        } else {
+                            setAmount(String(Math.round(rawAmount)));
+                        }
+                    } catch {
                         setAmount(String(Math.round(rawAmount)));
-                        setConversionInfo(null);
                     }
-                } catch {
-                    setAmount(String(Math.round(rawAmount)));
-                    setConversionInfo(null);
+                } else {
+                    setAmount(rawAmount != null ? String(roundAmount(rawAmount, userCur)) : "");
                 }
-            } else {
-                setAmount(rawAmount != null ? String(roundAmount(rawAmount, userCur)) : "");
-                setConversionInfo(null);
+            } catch (err: unknown) {
+                const code = (err as { error?: { code?: string } })?.error?.code;
+                const msg =
+                    code === "AI_NOT_A_RECEIPT"     ? "Không tìm thấy thông tin giao dịch. Vui lòng nhập thủ công." :
+                    code === "AI_IMAGE_TOO_BLURRY"  ? "Ảnh quá mờ, không đọc được. Vui lòng nhập thủ công." :
+                    code === "AI_LIMIT_REACHED"     ? "Dịch vụ quét hóa đơn tạm thời không khả dụng. Vui lòng nhập thủ công." :
+                    code === "THIRD_PARTY_ERROR"    ? "Không thể kết nối dịch vụ AI. Vui lòng nhập thủ công." :
+                                                      "Không thể đọc hóa đơn. Vui lòng nhập thủ công.";
+                setScanError(msg);
+            } finally {
+                setScanning(false);
             }
+        })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [file]);
 
-            setPhase("review");
-        } catch (err: unknown) {
-            const code = (err as { error?: { code?: string } })?.error?.code;
-            const msg =
-                code === "AI_NOT_A_RECEIPT"
-                    ? "Không tìm thấy thông tin giao dịch. Hãy thử ảnh khác hoặc nhập thủ công."
-                    : code === "AI_IMAGE_TOO_BLURRY"
-                      ? "Ảnh quá mờ, không đọc được. Vui lòng chụp lại rõ hơn."
-                      : code === "AI_LIMIT_REACHED"
-                        ? "Dịch vụ quét hóa đơn tạm thời không khả dụng. Vui lòng nhập thủ công."
-                        : code === "THIRD_PARTY_ERROR"
-                          ? "Không thể kết nối dịch vụ AI. Vui lòng thử lại sau."
-                          : "Không thể đọc hóa đơn. Vui lòng thử lại hoặc nhập thủ công.";
-            setScanError(msg);
-            setPhase("preview");
-        }
-    }
-
-    const allCategoriesSet = !!selectedCategoryId;
+    const canSave = !scanning && !!selectedCategoryId && parseFloat(amount) > 0;
     const cfg = TYPE_CONFIG[selectedType];
 
     async function handleConfirm() {
-        if (!suggestion || !selectedCategoryId || saving) return;
+        if (!canSave || saving) return;
         const parsedAmount = parseFloat(amount);
-        if (isNaN(parsedAmount) || parsedAmount <= 0) return;
-        const splits = [
-            {
-                categoryId: selectedCategoryId,
-                amount: Math.round(parsedAmount),
-            },
-        ];
 
         setSaving(true);
         setSaveError(null);
         try {
-            await transactionsApi.createFromReceipt({
-                type: selectedType,
-                transactionDate: dateTime,
-                receiptId: suggestion.receiptId!,
-                note: note.trim() || undefined,
-                items: splits,
-            });
+            if (suggestion?.receiptId) {
+                await transactionsApi.createFromReceipt({
+                    type: selectedType,
+                    transactionDate: dateTime,
+                    receiptId: suggestion.receiptId,
+                    note: note.trim() || undefined,
+                    items: [{ categoryId: selectedCategoryId, amount: Math.round(parsedAmount) }],
+                });
+            } else {
+                await transactionsApi.create({
+                    type: selectedType,
+                    amount: Math.round(parsedAmount),
+                    transactionDate: dateTime.slice(0, 10),
+                    categoryId: selectedCategoryId,
+                    note: note.trim() || undefined,
+                });
+            }
             setSaveSuccess(true);
             setTimeout(() => navigate("/", { replace: true }), 800);
         } catch {
@@ -240,138 +212,67 @@ export const ReceiptReviewPage = () => {
 
     if (!file) return null;
 
-    /* ══════════════════════════════════════════
-       Phase: preview / scanning
-    ══════════════════════════════════════════ */
-    if (phase === "preview" || phase === "scanning") {
-        const scanning = phase === "scanning";
-        return (
-            <div className="rxv-page">
-                <header className="rxv-header">
-                    <button
-                        className="rxv-header__back"
-                        onClick={() => navigate(-1)}
-                        aria-label="Quay lại"
-                        type="button"
-                        disabled={scanning}
-                    >
-                        <Icon name="arrow_back" size={22} />
-                    </button>
-                    <h1 className="rxv-header__title">
-                        {scanning ? "Đang đọc hóa đơn..." : "Xem trước hóa đơn"}
-                    </h1>
-                    <div style={{ width: 40 }} />
-                </header>
-
-                <div className="rxv-preview-body">
-                    <span
-                        className="rxv-type-badge"
-                        style={{ background: cfg.color }}
-                    >
-                        {cfg.label}
-                    </span>
-
-                    <div
-                        className={`rxv-preview-wrap${scanning ? " rxv-preview-wrap--scanning" : ""}`}
-                    >
-                        <img
-                            src={imageUrl}
-                            alt="Hóa đơn"
-                            className="rxv-preview-img"
-                        />
-                        {scanning && (
-                            <div className="rxv-scan-overlay">
-                                <Icon
-                                    name="progress_activity"
-                                    size={44}
-                                    className="spin-icon"
-                                />
-                                <p>Đang phân tích hóa đơn...</p>
-                            </div>
-                        )}
-                    </div>
-
-                    {scanError && (
-                        <div className="rxv-error-box">
-                            <Icon name="error_outline" size={16} />
-                            {scanError}
-                        </div>
-                    )}
-                </div>
-
-                {!scanning && (
-                    <div className="rxv-preview-footer">
-                        <button
-                            className="rxv-btn rxv-btn--ghost"
-                            onClick={() => navigate(-1)}
-                            type="button"
-                        >
-                            <Icon name="arrow_back" size={18} />
-                            Chọn ảnh khác
-                        </button>
-                        <button
-                            className="rxv-btn rxv-btn--primary"
-                            style={{ background: cfg.color }}
-                            onClick={handleScan}
-                            type="button"
-                        >
-                            Đọc hóa đơn
-                            <Icon name="arrow_forward" size={18} />
-                        </button>
-                    </div>
-                )}
-            </div>
-        );
-    }
-
-    /* ══════════════════════════════════════════
-       Phase: review
-    ══════════════════════════════════════════ */
     return (
         <div className="rxv-page">
+            {/* Header */}
             <div className="detail-sheet__topbar rxv-topbar">
                 <button
                     className="detail-sheet__close rxv-back-btn"
-                    onClick={() => {
-                        setPhase("preview");
-                        setScanError(null);
-                    }}
+                    onClick={() => navigate(-1)}
                     aria-label="Quay lại"
                     type="button"
                     disabled={saving}
                 >
                     <Icon name="arrow_back" size={20} />
                 </button>
-                <span className="detail-sheet__title">Xác nhận giao dịch</span>
+                <span className="detail-sheet__title">
+                    {scanning ? "Đang đọc hóa đơn..." : "Xác nhận giao dịch"}
+                </span>
                 <div style={{ width: 28 }} />
             </div>
 
             <div className="detail-sheet__body rxv-review-body">
-                {/* ── Loại giao dịch — dropdown ── */}
+                {/* Ảnh hóa đơn + scanning overlay */}
+                <div className="rxv-img-wrap">
+                    <img src={imageUrl} alt="Hóa đơn" className="rxv-preview-img rxv-preview-img--inline" />
+                    {scanning && (
+                        <div className="rxv-scan-overlay rxv-scan-overlay--inline">
+                            <Icon name="progress_activity" size={36} className="spin-icon" />
+                            <p>Đang phân tích...</p>
+                        </div>
+                    )}
+                </div>
+
+                {scanError && (
+                    <div className="rxv-error-box">
+                        <Icon name="error_outline" size={16} />
+                        {scanError}
+                    </div>
+                )}
+
+                {/* Loại giao dịch */}
                 <div className="detail-row">
                     <span className="detail-row__label">Loại</span>
                     <select
                         className="rxv-pill-select rxv-pill-select--type"
                         value={selectedType}
-                        onChange={(e) =>
-                            setSelectedType(e.target.value as TransactionType)
-                        }
+                        onChange={(e) => setSelectedType(e.target.value as TransactionType)}
                         style={{ color: cfg.color }}
+                        disabled={scanning}
                     >
                         {TX_TYPES.map((t) => (
-                            <option key={t} value={t}>
-                                {TYPE_CONFIG[t].label}
-                            </option>
+                            <option key={t} value={t}>{TYPE_CONFIG[t].label}</option>
                         ))}
                     </select>
                 </div>
 
-                {/* ── Danh mục ── */}
+                {/* Danh mục */}
                 <div className="detail-row">
                     <span className="detail-row__label">Danh mục</span>
                     <button
                         type="button"
                         className="rxv-cat-trigger"
+                        disabled={scanning}
                         onClick={(e) => {
                             setCatAnchorRect(e.currentTarget.getBoundingClientRect());
                             setCatOpen(true);
@@ -388,7 +289,7 @@ export const ReceiptReviewPage = () => {
                     </button>
                 </div>
 
-                {/* ── Số tiền — editable ── */}
+                {/* Số tiền */}
                 <div className="detail-row">
                     <span className="detail-row__label">Số tiền</span>
                     <div className="rxv-amount-col">
@@ -403,6 +304,7 @@ export const ReceiptReviewPage = () => {
                                     setConversionInfo(null);
                                 }}
                                 placeholder="—"
+                                disabled={scanning}
                             />
                             <span className="rxv-amount-currency">
                                 {accountCurrency === "VND" ? "đ" : accountCurrency}
@@ -416,13 +318,11 @@ export const ReceiptReviewPage = () => {
                     </div>
                 </div>
 
-                {/* ── Ngày giờ — datetime-local ── */}
+                {/* Ngày giờ */}
                 <div className="detail-row">
                     <span className="detail-row__label">Ngày giờ</span>
                     <div className="rxv-date-row">
-                        <span className="detail-row__value">
-                            {formatDateTimeDisplay(dateTime)}
-                        </span>
+                        <span className="detail-row__value">{formatDateTimeDisplay(dateTime)}</span>
                         <input
                             ref={dateInputRef}
                             type="datetime-local"
@@ -436,14 +336,12 @@ export const ReceiptReviewPage = () => {
                             type="button"
                             className="rxv-date-edit-btn"
                             aria-label="Chỉnh ngày giờ"
+                            disabled={scanning}
                             onClick={() => {
                                 const input = dateInputRef.current;
                                 if (!input) return;
-                                if (typeof input.showPicker === "function") {
-                                    input.showPicker();
-                                } else {
-                                    input.click();
-                                }
+                                if (typeof input.showPicker === "function") input.showPicker();
+                                else input.click();
                             }}
                         >
                             <Icon name="edit" size={14} />
@@ -451,7 +349,7 @@ export const ReceiptReviewPage = () => {
                     </div>
                 </div>
 
-                {/* ── Nội dung (Note) — editable ── */}
+                {/* Nội dung */}
                 <div className="detail-row">
                     <span className="detail-row__label">Nội dung</span>
                     <div className="rxv-inline-row">
@@ -461,12 +359,13 @@ export const ReceiptReviewPage = () => {
                             onChange={(e) => setNote(e.target.value)}
                             placeholder="Nhập nội dung..."
                             maxLength={500}
+                            disabled={scanning}
                         />
                         <Icon name="edit" size={14} className="rxv-date-edit-icon" />
                     </div>
                 </div>
 
-                {/* ── Cửa hàng — editable ── */}
+                {/* Cửa hàng */}
                 <div className="detail-row">
                     <span className="detail-row__label">Cửa hàng</span>
                     <div className="rxv-inline-row">
@@ -476,14 +375,10 @@ export const ReceiptReviewPage = () => {
                             onChange={(e) => setMerchant(e.target.value)}
                             placeholder="—"
                             maxLength={200}
+                            disabled={scanning}
                         />
                         <Icon name="edit" size={14} className="rxv-date-edit-icon" />
                     </div>
-                </div>
-
-                {/* ── Ảnh hóa đơn ── */}
-                <div className="detail-sheet__receipt">
-                    <img src={imageUrl} alt="Hóa đơn" />
                 </div>
 
                 {saveError && (
@@ -511,10 +406,7 @@ export const ReceiptReviewPage = () => {
                                 key={cat.id}
                                 type="button"
                                 className={`dropdown-option${selectedCategoryId === cat.id ? " dropdown-option--active" : ""}`}
-                                onClick={() => {
-                                    setSelectedCategoryId(cat.id);
-                                    setCatOpen(false);
-                                }}
+                                onClick={() => { setSelectedCategoryId(cat.id); setCatOpen(false); }}
                             >
                                 {cat.icon && <Icon name={cat.icon} size={18} />}
                                 <span className="dropdown-option__label">{cat.name}</span>
@@ -527,36 +419,23 @@ export const ReceiptReviewPage = () => {
                 </>
             )}
 
-            {/* Sticky confirm footer */}
+            {/* Sticky footer */}
             <div className="rxv-footer">
                 <button
                     className="rxv-confirm-btn"
-                    style={{
-                        background:
-                            allCategoriesSet && !saveSuccess
-                                ? cfg.color
-                                : undefined,
-                    }}
-                    disabled={!allCategoriesSet || saving || saveSuccess}
+                    style={{ background: canSave && !saveSuccess ? cfg.color : undefined }}
+                    disabled={!canSave || saving || saveSuccess}
                     onClick={handleConfirm}
                     type="button"
                 >
                     {saving ? (
-                        <>
-                            <Icon
-                                name="progress_activity"
-                                size={18}
-                                className="spin-icon"
-                            />
-                            Đang lưu...
-                        </>
+                        <><Icon name="progress_activity" size={18} className="spin-icon" />Đang lưu...</>
                     ) : saveSuccess ? (
-                        <>
-                            <Icon name="check_circle" size={18} />
-                            Đã lưu!
-                        </>
+                        <><Icon name="check_circle" size={18} />Đã lưu!</>
+                    ) : scanning ? (
+                        "Đang đọc hóa đơn..."
                     ) : (
-                        "Xác nhận & Lưu"
+                        "Xong"
                     )}
                 </button>
             </div>

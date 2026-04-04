@@ -12,12 +12,6 @@ const TX_OPTIONS: Array<{ type: TxType; label: string; icon: string; desc: strin
     { type: "saving",     label: "Tiết kiệm",       icon: "savings",           desc: "Ghi nhận khoản tiết kiệm" },
 ];
 
-const INPUT_METHODS = [
-    { key: "camera",  label: "Chụp ảnh hóa đơn",   icon: "photo_camera", desc: "Chụp ảnh để nhập tự động",  highlighted: true  },
-    { key: "gallery", label: "Tải ảnh từ thư viện", icon: "image",        desc: "Chọn ảnh đã chụp sẵn",     highlighted: false },
-    { key: "manual",  label: "Nhập thủ công",        icon: "edit",         desc: "Điền thông tin bằng tay",  highlighted: false },
-];
-
 /* ─── TxSheet ─── */
 function TxSheet({
     onClose,
@@ -25,25 +19,12 @@ function TxSheet({
     onGallerySelect,
 }: {
     onClose: () => void;
-    onCameraSelect: (type: TxType) => void;
-    onGallerySelect: (type: TxType) => void;
+    onCameraSelect: () => void;
+    onGallerySelect: () => void;
 }) {
     const navigate = useNavigate();
-    const [selectedType, setSelectedType] = useState<TxType | null>(null);
-
-    function handleMethodSelect(key: string) {
-        if (!selectedType) return;
-        onClose();
-        if (key === "manual") {
-            navigate(`/add-transaction?type=${selectedType}`);
-        } else if (key === "camera") {
-            onCameraSelect(selectedType);
-        } else if (key === "gallery") {
-            onGallerySelect(selectedType);
-        }
-    }
-
-    const txOpt = selectedType ? TX_OPTIONS.find((o) => o.type === selectedType)! : null;
+    // "manual" sub-step: show type selection only for manual entry
+    const [manualStep, setManualStep] = useState(false);
 
     return (
         <>
@@ -52,10 +33,10 @@ function TxSheet({
                 <div className="sheet__handle" />
 
                 <div className="sheet__title-row">
-                    {selectedType && (
+                    {manualStep && (
                         <button
                             className="sheet__back"
-                            onClick={() => setSelectedType(null)}
+                            onClick={() => setManualStep(false)}
                             aria-label="Quay lại"
                             type="button"
                         >
@@ -63,17 +44,20 @@ function TxSheet({
                         </button>
                     )}
                     <span className="sheet__title">
-                        {selectedType ? `Phương thức — ${txOpt!.label}` : "Loại giao dịch"}
+                        {manualStep ? "Chọn loại giao dịch" : "Thêm giao dịch"}
                     </span>
                 </div>
 
                 <div className="sheet__options">
-                    {!selectedType
-                        ? TX_OPTIONS.map((opt) => (
+                    {manualStep ? (
+                        TX_OPTIONS.map((opt) => (
                             <button
                                 key={opt.type}
                                 className={`sheet-option sheet-option--${opt.type}`}
-                                onClick={() => setSelectedType(opt.type)}
+                                onClick={() => {
+                                    onClose();
+                                    navigate(`/add-transaction?type=${opt.type}`);
+                                }}
                             >
                                 <span className={`sheet-option__icon sheet-option__icon--${opt.type}`}>
                                     <Icon name={opt.icon} size={22} />
@@ -85,23 +69,49 @@ function TxSheet({
                                 <Icon name="chevron_right" size={18} className="sheet-option__chevron" />
                             </button>
                         ))
-                        : INPUT_METHODS.map((m) => (
+                    ) : (
+                        <>
                             <button
-                                key={m.key}
-                                className={`sheet-option${m.highlighted ? " sheet-option--income sheet-option--highlighted" : ""}`}
-                                onClick={() => handleMethodSelect(m.key)}
+                                className="sheet-option sheet-option--income sheet-option--highlighted"
+                                onClick={onCameraSelect}
                             >
-                                <span className={`sheet-option__icon sheet-option__icon--${m.highlighted ? "income" : m.key === "gallery" ? "investment" : "saving"}`}>
-                                    <Icon name={m.icon} size={22} />
+                                <span className="sheet-option__icon sheet-option__icon--income">
+                                    <Icon name="photo_camera" size={22} />
                                 </span>
                                 <span className="sheet-option__body">
-                                    <span className="sheet-option__name">{m.label}</span>
-                                    <span className="sheet-option__desc">{m.desc}</span>
+                                    <span className="sheet-option__name">Chụp ảnh hóa đơn</span>
+                                    <span className="sheet-option__desc">Chụp ảnh để nhập tự động</span>
                                 </span>
                                 <Icon name="chevron_right" size={18} className="sheet-option__chevron" />
                             </button>
-                        ))
-                    }
+                            <button
+                                className="sheet-option"
+                                onClick={onGallerySelect}
+                            >
+                                <span className="sheet-option__icon sheet-option__icon--gallery">
+                                    <Icon name="image" size={22} />
+                                </span>
+                                <span className="sheet-option__body">
+                                    <span className="sheet-option__name">Thêm ảnh từ thư viện</span>
+                                    <span className="sheet-option__desc">Chọn ảnh đã chụp sẵn</span>
+                                </span>
+                                <Icon name="chevron_right" size={18} className="sheet-option__chevron" />
+                            </button>
+                            <button
+                                className="sheet-option"
+                                onClick={() => setManualStep(true)}
+                            >
+                                <span className="sheet-option__icon sheet-option__icon--manual">
+                                    <Icon name="edit" size={22} />
+                                </span>
+                                <span className="sheet-option__body">
+                                    <span className="sheet-option__name">Nhập thủ công</span>
+                                    <span className="sheet-option__desc">Điền thông tin bằng tay</span>
+                                </span>
+                                <Icon name="chevron_right" size={18} className="sheet-option__chevron" />
+                            </button>
+                        </>
+                    )}
                 </div>
             </div>
         </>
@@ -137,14 +147,13 @@ export const BottomNav = () => {
         e.target.value = "";
     }
 
-    function handleCameraSelect(type: TxType) {
-        pendingTypeRef.current = type;
-        // Slight delay so the sheet can unmount before triggering the input
+    function handleCameraSelect() {
+        pendingTypeRef.current = "expense";
         setTimeout(() => cameraInputRef.current?.click(), 120);
     }
 
-    function handleGallerySelect(type: TxType) {
-        pendingTypeRef.current = type;
+    function handleGallerySelect() {
+        pendingTypeRef.current = "expense";
         setTimeout(() => galleryInputRef.current?.click(), 120);
     }
 
@@ -219,8 +228,8 @@ export const BottomNav = () => {
             {fabOpen && (
                 <TxSheet
                     onClose={closeFab}
-                    onCameraSelect={handleCameraSelect}
-                    onGallerySelect={handleGallerySelect}
+                    onCameraSelect={() => { closeFab(); handleCameraSelect(); }}
+                    onGallerySelect={() => { closeFab(); handleGallerySelect(); }}
                 />
             )}
         </>
